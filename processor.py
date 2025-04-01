@@ -535,10 +535,12 @@ def process_season_data(year: int):
             try:
                 race_session = ff1.get_session(year, round_number, 'R')
                 # Load laps only if chart data needs generating
-                load_laps_for_charts = not all([
-                    lap_times_file.exists(), tire_strategy_file.exists(),
-                    session_drivers_file.exists(), positions_file.exists()
-                ])
+                # Force loading laps for charts to ensure data is always processed
+                load_laps_for_charts = True # Force load laps
+                # load_laps_for_charts = not all([
+                #     lap_times_file.exists(), tire_strategy_file.exists(),
+                #     session_drivers_file.exists(), positions_file.exists()
+                # ])
                 print(f"    -> Loading laps for Race charts: {load_laps_for_charts}")
                 race_session.load(laps=load_laps_for_charts, telemetry=False, weather=False, messages=False)
                 race_session_results = race_session.results # Store for points and charts

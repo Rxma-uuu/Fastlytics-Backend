@@ -143,18 +143,9 @@ async def get_session_drivers(
             print(f"Returning cached session drivers for {year} {event} {session}.")
             return cached_drivers
 
-        # If not cached, fetch live (consider if this is desired or if processor should handle all)
-        print(f"Cache miss. Fetching live session drivers for {year} {event} {session}.")
-        # data_processing needs update to handle different session types if live fetching is kept
-        driver_list = data_processing.fetch_session_drivers(year, event, session)
-        if not driver_list:
-            raise HTTPException(status_code=404, detail="No drivers found for the specified session.")
-
-        # Optionally save to cache after fetching live
-        # save_json(driver_list, cache_file) # Need save_json helper or move logic
-
-        print(f"Returning {len(driver_list)} drivers for session.")
-        return driver_list
+        # If not cached, raise error (rely on processor script)
+        print(f"Cache miss for session drivers: {cache_file}")
+        raise HTTPException(status_code=404, detail=f"Session drivers data not available for {year} {event} {session}. Run processor script.")
     except Exception as e:
         print(f"Error fetching session drivers: {e}")
         # Consider more specific error codes based on exception type if needed
@@ -189,20 +180,21 @@ async def get_lap_times(
              if any(all(drv in lap for drv in drivers) for lap in filtered_data):
                   print(f"Returning cached lap times for {drivers} in {year} {event} {session}.")
                   return filtered_data
+             # If cache hit but drivers seem missing, still return the filtered data or raise error
+             # For simplicity, let's return what we found or raise if nothing matched
+             if not filtered_data or not any(any(drv in lap for drv in drivers) for lap in filtered_data):
+                  print(f"Cache hit, but requested drivers {drivers} not found in {cache_file}")
+                  # Raise 404 as the data for *these specific drivers* isn't in the expected format/file
+                  raise HTTPException(status_code=404, detail=f"Lap time data for requested drivers not found in cache for {year} {event} {session}.")
              else:
-                  print("Cache hit, but requested drivers not fully present. Fetching live.")
+                  # Return the data filtered from cache even if not all drivers present in every lap dict key
+                  print(f"Returning potentially partially filtered cached lap times for {drivers} in {year} {event} {session}.")
+                  return filtered_data
 
 
-        # If not cached or drivers missing, fetch live
-        print(f"Cache miss or incomplete. Fetching live lap times for {drivers} in {year} {event} {session}.")
-        # data_processing needs update to handle different session types if live fetching is kept
-        lap_data_df = data_processing.fetch_and_process_laptimes_multi(year, event, session, drivers)
-        if lap_data_df is None or lap_data_df.empty:
-             raise HTTPException(status_code=404, detail="Lap time data not found for the specified criteria.")
-        result_json = lap_data_df.to_dict(orient='records')
-        # Optionally save to cache (though processor.py already does this)
-        # save_json(lap_data_df, cache_file)
-        return result_json
+        # If cache file itself was not found
+        print(f"Cache miss for lap times: {cache_file}")
+        raise HTTPException(status_code=404, detail=f"Lap time data not available for {year} {event} {session}. Run processor script.")
     except Exception as e:
         print(f"Error fetching lap times: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch lap times: {e}")
@@ -277,15 +269,9 @@ async def get_tire_strategy(
             print(f"Returning cached tire strategy for {year} {event} {session}.")
             return cached_strategy
 
-        # If not cached, fetch live
-        print(f"Cache miss. Fetching live tire strategy for {year} {event} {session}.")
-        # data_processing needs update to handle different session types if live fetching is kept
-        strategy_data = data_processing.fetch_and_process_tire_strategy(year, event, session)
-        if strategy_data is None or not strategy_data:
-             raise HTTPException(status_code=404, detail="Tire strategy data not found.")
-        # Optionally save to cache
-        # save_json(strategy_data, cache_file)
-        return strategy_data
+        # If not cached, raise error (rely on processor script)
+        print(f"Cache miss for tire strategy: {cache_file}")
+        raise HTTPException(status_code=404, detail=f"Tire strategy data not available for {year} {event} {session}. Run processor script.")
     except Exception as e:
         print(f"Error fetching tire strategy: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch tire strategy: {e}")
@@ -467,15 +453,16 @@ async def get_specific_race_result_api(
     """ Retrieves detailed results for a specific session from cache. """
     print(f"Received request for specific session results: {year} / {event_slug} / {session}")
     try:
-        # Session-specific cache file naming
-        session_suffix = f"_{session}" if session != "R" else ""
+        # Corrected session-specific cache file naming
+        session_suffix = f"_{session}" # Always include the session suffix
         race_filename = f"{event_slug.replace('-', '_')}{session_suffix}.json"
         results_file = DATA_CACHE_PATH / str(year) / "races" / race_filename
+        print(f"Attempting to read cache file: {results_file}") # Add log for debugging
         results_data = read_json_cache(results_file)
         if results_data is None:
             # TODO: Fetch live if cache miss?
-            raise HTTPException(status_code=404, detail=f"Detailed results not found for {year} {event_slug.replace('_', ' ')}. Run processor script.")
-        print(f"Returning detailed results for {year} {event_slug}")
+            raise HTTPException(status_code=404, detail=f"Detailed results not found for {year} {event_slug.replace('_', ' ')} session {session}. Run processor script.") # Updated error message
+        print(f"Returning detailed results for {year} {event_slug} session {session}")
         return results_data
     except HTTPException as http_exc: raise http_exc
     except Exception as e: print(f"Unexpected error: {e}"); raise HTTPException(status_code=500)
