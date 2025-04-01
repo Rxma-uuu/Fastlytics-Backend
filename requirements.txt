@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard] # ASGI server with standard extras (like websockets, if needed later)
 fastf1
 pandas
-python-dotenv # To load .env file for backend if needed (e.g., for REDIS_URL)
+python-dotenv
+gunicorn # To load .env file for backend if needed (e.g., for REDIS_URL)
 # Add other dependencies like redis if you plan to use it for caching
 # redis
