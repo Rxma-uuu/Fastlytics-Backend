@@ -129,9 +129,15 @@ def process_qualifying_segment(laps: pd.DataFrame, session_id: str) -> list[dict
     # Assuming 'Segment' column exists for now.
     if 'Segment' not in laps.columns:
         print(f"    !! 'Segment' column not found in lap data for {session_id}. Cannot process segment.")
-        return [] # Cannot process without segment info
+        # Fallback: If no segment column, assume all laps belong to the requested segment (e.g., 'Q')
+        if session_id in ['Q', 'SQ']:
+             segment_laps = laps.copy()
+             print(f"    -> WARNING: 'Segment' column missing, using all laps for {session_id}")
+        else:
+             return []
+    else:
+        segment_laps = laps[laps['Segment'] == session_id].copy()
 
-    segment_laps = laps[laps['Segment'] == session_id].copy()
     if segment_laps.empty:
         print(f"    !! No laps found for segment {session_id}")
         return []
@@ -198,14 +204,15 @@ def process_qualifying_segment(laps: pd.DataFrame, session_id: str) -> list[dict
     return processed
 
 
-def process_session_results(year: int, event: str, session_identifier: str):
+def process_session_results(year: int, event: str, session_identifier: str, save_file: bool = True):
     """
     Process results for a specific session (FP1, Q1, R, Sprint, etc.)
-    and save relevant columns to JSON.
+    and optionally save relevant columns to JSON. Always returns processed data.
     """
-    print(f"  -> Processing results for: {year} {event} {session_identifier}")
+    print(f"  -> Processing results for: {year} {event} {session_identifier} (Save: {save_file})")
     processed_results = []
-    event_slug = event.replace(' ', '_') # Use event name for slug consistency
+    # Ensure consistent lowercase slug for results files (using event name passed in)
+    event_slug = event.lower().replace(' ', '_')
     results_file = DATA_CACHE_PATH / str(year) / "races" / f"{event_slug}_{session_identifier}.json"
 
     try:
@@ -222,11 +229,17 @@ def process_session_results(year: int, event: str, session_identifier: str):
         # Load session data
         session_to_load = parent_session_id if is_segment else session_identifier
         session_obj = ff1.get_session(year, event, session_to_load)
-        load_laps = session_identifier.startswith(('FP', 'Q', 'SQ')) or is_segment # Load laps for FP, Q, SQ and segments
-        session_obj.load(laps=load_laps, telemetry=False, weather=False, messages=False)
+        # Determine if laps *should* be loaded based on session type
+        should_load_laps = session_identifier.startswith(('FP', 'Q', 'SQ')) or is_segment
+        # Force load laps for R and Sprint as well, as they are needed for fastest lap calc
+        if session_identifier == 'R' or session_identifier == 'Sprint':
+            should_load_laps = True
+        print(f"    -> Loading laps for {session_identifier}: {should_load_laps}")
+        session_obj.load(laps=should_load_laps, telemetry=False, weather=False, messages=False)
 
         results = session_obj.results
-        laps_data = session_obj.laps if load_laps else None
+        # Assign laps_data *after* loading, based on should_load_laps
+        laps_data = session_obj.laps if should_load_laps else None
 
         if results is None: results = pd.DataFrame() # Ensure results is DataFrame
 
@@ -268,6 +281,10 @@ def process_session_results(year: int, event: str, session_identifier: str):
                     driver_code = str(row.get('Abbreviation')) if pd.notna(row.get('Abbreviation')) else None
                     if not driver_code: continue
 
+                    # --- Add Debug Print Here (Raw Row) ---
+                    # print(f"      -> Raw Row for {driver_code}: Pos={row.get('Position')}, Grid={row.get('GridPosition')}, Q1={row.get('Q1')}, Q2={row.get('Q2')}, Q3={row.get('Q3')}")
+                    # --- End Debug Print ---
+
                     result = {
                         'position': int(row['Position']) if pd.notna(row['Position']) else None,
                         'driverCode': driver_code,
@@ -280,6 +297,9 @@ def process_session_results(year: int, event: str, session_identifier: str):
                     if session_identifier == 'R' or session_identifier == 'Sprint':
                         result['points'] = float(row.get('Points', 0.0)) if pd.notna(row.get('Points')) else 0.0
                         result['gridPosition'] = int(row.get('GridPosition')) if pd.notna(row.get('GridPosition')) else None
+                         # --- Add Debug Print Here (Processed GridPos) ---
+                        # print(f"      -> Processed Result for {driver_code}: gridPosition={result.get('gridPosition')}")
+                         # --- End Debug Print ---
                         # isFastestLap might need separate handling
                     elif session_identifier.startswith('FP'):
                          result['points'] = 0.0
@@ -299,24 +319,65 @@ def process_session_results(year: int, event: str, session_identifier: str):
                     processed_results.append(result)
                 # Sort standard results by position
                 processed_results.sort(key=lambda x: (x['position'] is None, x['position']))
+
+                # --- DEBUG: Print Qualifying Times before returning ---
+                if session_identifier.startswith('Q'):
+                    print(f"    -> DEBUG: Qualifying data being processed: {processed_results}") # Added this print
+
+                # --- Add Fastest Lap Flag (specifically for Race 'R' or 'Sprint') ---
+                if (session_identifier == 'R' or session_identifier == 'Sprint') and laps_data is not None and not laps_data.empty:
+                    try:
+                        fastest_lap = laps_data.pick_fastest()
+                        if fastest_lap is not None and pd.notna(fastest_lap['Driver']):
+                            fastest_driver_code = str(fastest_lap['Driver'])
+                            fastest_time_formatted = format_lap_time(fastest_lap['LapTime'])
+                            print(f"    -> Fastest lap found: Driver {fastest_driver_code}, Time {fastest_time_formatted}")
+                            for res in processed_results:
+                                is_fastest = (res.get('driverCode') == fastest_driver_code)
+                                res['isFastestLap'] = is_fastest
+                                if is_fastest:
+                                    res['fastestLapTimeValue'] = fastest_time_formatted # Store the formatted time
+                        else:
+                            print("    -> Could not determine fastest lap holder.")
+                            for res in processed_results:
+                                res['isFastestLap'] = False # Ensure flag is present and false if none found
+                    except Exception as fl_err:
+                        print(f"    !! Error determining fastest lap: {fl_err}")
+                        for res in processed_results:
+                             res['isFastestLap'] = False # Default to false on error
+                elif (session_identifier == 'R' or session_identifier == 'Sprint'):
+                     print("    !! No lap data available to determine fastest lap.")
+                     for res in processed_results:
+                          res['isFastestLap'] = False # Ensure flag is present and false if no laps
+                          res.pop('fastestLapTimeValue', None) # Remove potential value if laps aren't available
+
+                # --- Pole Lap Time logic removed - will be handled in process_season_data ---
+
             else:
                  print(f"    !! No results or lap data found for {year} {event} {session_identifier}")
 
-        # Save the processed results (even if empty)
-        save_json(processed_results, results_file)
-        print(f"    -> Saved results ({len(processed_results)} drivers) for {session_identifier} to {results_file.name}")
-        return processed_results
+        # Save the processed results (even if empty), only if requested
+        if save_file:
+            save_json(processed_results, results_file)
+            print(f"    -> Saved results ({len(processed_results)} drivers) for {session_identifier} to {results_file.name}")
+        else:
+            print(f"    -> Processed results ({len(processed_results)} drivers) for {session_identifier}, skipping save.")
+        return processed_results # Always return the processed data
 
     except Exception as e:
         print(f"    !! Error processing session results for {session_identifier}: {e}")
         # Attempt to save empty file on error
         try:
             if not results_file.exists():
-                 save_json([], results_file)
-                 print(f"    -> Saved empty results file for {session_identifier} due to error.")
+                 # Save empty file only if saving was requested
+                 if save_file:
+                     save_json([], results_file)
+                     print(f"    -> Saved empty results file for {session_identifier} due to error.")
+                 else:
+                      print(f"    -> Returning empty results for {session_identifier} due to error (save skipped).")
         except Exception as save_err:
              print(f"    !! Failed to save empty results file after error: {save_err}")
-        return None
+        return [] # Return empty list on error
 
 
 def _process_session_points(results: pd.DataFrame | None,
@@ -430,10 +491,12 @@ def process_season_data(year: int):
             event_name = event['EventName']
             round_number = event['RoundNumber']
             event_format = event['EventFormat']
-            event_slug = event_name.replace(' ', '_')
+            # Ensure event_slug is lowercase for consistent file naming
+            event_slug = event_name.lower().replace(' ', '_')
 
             print(f"\nProcessing event: {event_name} (Round {round_number}, Format: {event_format})...")
             # Chart file paths (remain the same, based on event slug)
+            # Use the lowercase slug for chart file paths as well
             lap_times_file = charts_path / f"{event_slug}_laptimes.json"
             tire_strategy_file = charts_path / f"{event_slug}_tirestrategy.json"
             session_drivers_file = charts_path / f"{event_slug}_drivers.json"
@@ -497,134 +560,105 @@ def process_season_data(year: int):
             final_session_list = sorted(list(set(sessions_to_process)), key=lambda x: ['FP1','FP2','FP3','SQ1','SQ2','SQ3','Q1','Q2','Q3','Sprint','R'].index(x) if x in ['FP1','FP2','FP3','SQ1','SQ2','SQ3','Q1','Q2','Q3','Sprint','R'] else 99)
             print(f"  -> Sessions/Segments to process: {final_session_list}")
 
-            # Process each identified session/segment (FP, Q segments, SQ segments)
-            # Points accumulation happens separately below for Sprint and Race
-            race_session_results_for_charts = None # Store R results for chart processing
+            # --- Process Non-Race/Sprint Sessions First (FP, Q, SQ) ---
+            print(f"  -> Processing non-points sessions (FP, Q, SQ)...")
+            qualifying_times_by_driver = {} # Store best Q time per driver
             for session_id in final_session_list:
-                if session_id not in ['Sprint', 'R']: # Process non-points sessions first
+                if session_id not in ['Sprint', 'R']:
                     # Pass loaded Q laps to avoid reloading if processing Q1/Q2/Q3
-                    laps_to_pass = q_session_laps if session_id in ['Q1', 'Q2', 'Q3'] else None
-                    # Need similar logic for SQ laps if processing SQ1/2/3
-                    process_session_results(year, event_name, session_id) # process_session_results needs update to accept laps_to_pass
-
+                    # laps_to_pass = q_session_laps if session_id in ['Q1', 'Q2', 'Q3'] else None # TODO: Refine if needed
+                    processed_data = process_session_results(year, event_name, session_id, save_file=True)
+                    # Store qualifying times if processing Q/Q1/Q2/Q3
+                    if session_id.startswith('Q') and processed_data:
+                        for res in processed_data:
+                            driver_code = res.get('driverCode')
+                            # Use fastestLapTime for segments, or q3/q2/q1 for parent Q
+                            q_time = res.get('fastestLapTime') or res.get('q3Time') or res.get('q2Time') or res.get('q1Time')
+                            if driver_code and q_time:
+                                # Store the best time found so far for this driver
+                                if driver_code not in qualifying_times_by_driver or q_time < qualifying_times_by_driver[driver_code]:
+                                     qualifying_times_by_driver[driver_code] = q_time
+            # --- DEBUG: Print collected qualifying times ---
+            print(f"    -> Collected qualifying times: {qualifying_times_by_driver}")
             # --- Process Sprint Session (if applicable) ---
             is_sprint = is_sprint_weekend(event_format)
-            sprint_session_results = None
-            if is_sprint:
-                print(f"  -> Processing Sprint session for {event_name}...")
-                try:
-                    sprint_session = ff1.get_session(year, round_number, 'Sprint')
-                    sprint_session.load(laps=False, telemetry=False, weather=False, messages=False)
-                    sprint_session_results = sprint_session.results # Store for potential use
-                    if sprint_session_results is not None and not sprint_session_results.empty:
-                        # Process points from Sprint
-                        _process_session_points(sprint_session_results, driver_standings, team_standings, is_sprint_session=True)
-                        # Save Sprint results (optional, if needed separately)
-                        sprint_results_file = races_path / f"{event_slug}_Sprint.json"
-                        save_json(sprint_session_results, sprint_results_file)
-                        print(f"    -> Saved Sprint results to {sprint_results_file.name}")
-                    else:
-                        print(f"    !! No results found for Sprint session {event_name}")
-                    del sprint_session
-                except Exception as sprint_err:
-                    print(f"    !! Error processing sprint session for {event_name}: {sprint_err}")
+            sprint_session_results_data = None # Store processed data
+            if is_sprint and 'Sprint' in final_session_list:
+                print(f"  -> Processing Sprint session points and results...")
+                # Process results and save the file
+                sprint_session_results_data = process_session_results(year, event_name, 'Sprint', save_file=True)
+                if sprint_session_results_data:
+                    # Process points using the returned data (convert to DataFrame first)
+                    _process_session_points(pd.DataFrame(sprint_session_results_data), driver_standings, team_standings, is_sprint_session=True)
+                else:
+                    print(f"    !! No results data returned for Sprint session {event_name}")
 
             # --- Process Race Session ---
-            print(f"  -> Processing Race session for {event_name}...")
-            race_session_results = None # Define before try block
-            try:
-                race_session = ff1.get_session(year, round_number, 'R')
-                # Load laps only if chart data needs generating
-                # Force loading laps for charts to ensure data is always processed
-                load_laps_for_charts = True # Force load laps
-                # load_laps_for_charts = not all([
-                #     lap_times_file.exists(), tire_strategy_file.exists(),
-                #     session_drivers_file.exists(), positions_file.exists()
-                # ])
-                print(f"    -> Loading laps for Race charts: {load_laps_for_charts}")
-                race_session.load(laps=load_laps_for_charts, telemetry=False, weather=False, messages=False)
-                race_session_results = race_session.results # Store for points and charts
+            print(f"  -> Processing Race session points, results, and charts...")
+            race_session_results_data = None # Store processed data
+            race_session_laps_data = None # Store laps data
+            if 'R' in final_session_list:
+                try:
+                    # Load Race session WITH LAPS
+                    race_session = ff1.get_session(year, round_number, 'R')
+                    print(f"    -> Loading Race session with laps...")
+                    race_session.load(laps=True, telemetry=False, weather=False, messages=False)
+                    race_session_raw_results = race_session.results # Raw results for points/wins
+                    race_session_laps_data = race_session.laps # Laps for charts/fastest lap
 
-                if race_session_results is not None and not race_session_results.empty:
-                    # Process points from Race
-                    _process_session_points(race_session_results, driver_standings, team_standings, is_sprint_session=False)
+                    if race_session_raw_results is not None and not race_session_raw_results.empty:
+                        # Process points from Race using raw results
+                        _process_session_points(race_session_raw_results, driver_standings, team_standings, is_sprint_session=False)
 
-                    # --- Count Wins and Podiums (ONLY from Race results) ---
-                    print("    -> Counting Wins and Podiums from Race results...")
-                    for _, res in race_session_results.iterrows():
-                        driver_code = str(res.get('Abbreviation')) if pd.notna(res.get('Abbreviation')) else None
-                        team_name = str(res.get('TeamName')) if pd.notna(res.get('TeamName')) else None
-                        position = res.get('Position')
+                        # --- Count Wins and Podiums (ONLY from Race results) ---
+                        print("    -> Counting Wins and Podiums from Race results...")
+                        for _, res in race_session_raw_results.iterrows():
+                            driver_code = str(res.get('Abbreviation')) if pd.notna(res.get('Abbreviation')) else None
+                            team_name = str(res.get('TeamName')) if pd.notna(res.get('TeamName')) else None
+                            position = res.get('Position')
 
-                        if not driver_code or not team_name or pd.isna(position): continue
-                        position = int(position)
+                            if not driver_code or not team_name or pd.isna(position): continue
+                            position = int(position)
 
-                        if position == 1:
-                            driver_standings[driver_code]['wins'] += 1
-                            team_standings[team_name]['wins'] += 1
-                        if position <= 3:
-                            driver_standings[driver_code]['podiums'] += 1
-                            team_standings[team_name]['podiums'] += 1
+                            if position == 1:
+                                driver_standings[driver_code]['wins'] += 1
+                                team_standings[team_name]['wins'] += 1
+                            if position <= 3:
+                                driver_standings[driver_code]['podiums'] += 1
+                                team_standings[team_name]['podiums'] += 1
 
-                    # Save Race results (processed format)
-                    # Re-run process_session_results just for 'R' to get the formatted output
-                    race_session_results_for_charts = process_session_results(year, event_name, 'R')
+                        # Process Race results format (including fastest lap), but DON'T save yet
+                        race_session_results_data = process_session_results(year, event_name, 'R', save_file=False)
 
-                    # --- Process Chart Data (using Race session laps if loaded) ---
-                    if load_laps_for_charts and race_session.laps is not None and not race_session.laps.empty:
-                        print("    -> Processing chart data for Race...")
-                        all_drivers_laps = race_session.laps['Driver'].unique()
-                        # Lap Times
-                        if not lap_times_file.exists():
-                            laps_filtered = race_session.laps.pick_drivers(all_drivers_laps).pick_accurate().copy()
-                            if not laps_filtered.empty:
-                                laps_filtered.loc[:, 'LapTimeSeconds'] = laps_filtered['LapTime'].dt.total_seconds()
-                                laps_pivot = laps_filtered.pivot_table(index='LapNumber', columns='Driver', values='LapTimeSeconds')
-                                laps_pivot = laps_pivot.reset_index()
-                                save_json(laps_pivot, lap_times_file)
-                        # Position Changes
-                        if not positions_file.exists():
-                            pos_data = race_session.laps[['LapNumber', 'Driver', 'Position']].dropna(subset=['Position'])
-                            if not pos_data.empty:
-                                pos_data['Position'] = pos_data['Position'].astype(int)
-                                pos_pivot = pos_data.pivot_table(index='LapNumber', columns='Driver', values='Position')
-                                pos_pivot = pos_pivot.reset_index()
-                                save_json(pos_pivot, positions_file)
-                        # Tire Strategy
-                        if not tire_strategy_file.exists():
-                            strategy_list = []
-                            for drv_code in all_drivers_laps:
-                                drv_laps = race_session.laps.pick_driver(drv_code)
-                                if drv_laps.empty: continue
-                                stints_grouped = drv_laps.groupby("Stint")
-                                stint_data = []
-                                for stint_num, stint_laps in stints_grouped:
-                                    if stint_laps.empty: continue
-                                    compound = stint_laps["Compound"].iloc[0]
-                                    start_lap = stint_laps["LapNumber"].min()
-                                    end_lap = stint_laps["LapNumber"].max()
-                                    lap_count = len(stint_laps)
-                                    stint_data.append({"compound": compound, "startLap": int(start_lap), "endLap": int(end_lap), "lapCount": int(lap_count)})
-                                if stint_data:
-                                    stint_data.sort(key=lambda x: x['startLap'])
-                                    strategy_list.append({"driver": drv_code, "stints": stint_data})
-                            save_json(strategy_list, tire_strategy_file)
-                        # Session Drivers (using results data from the main race session results)
-                        if not session_drivers_file.exists() and race_session_results_for_charts: # Use stored R results
-                            driver_list = [{"code": str(res['driverCode']), "name": res['fullName'], "team": res['team']}
-                                           for res in race_session_results_for_charts if res.get('driverCode')]
-                            driver_list.sort(key=lambda x: x['code'])
-                            save_json(driver_list, session_drivers_file)
-                        print(f"    -> Saved chart data for {event_name}.")
-                    elif load_laps_for_charts:
-                         print(f"    !! No lap data found for {event_name} Race, skipping chart data generation.")
+                        # Add pole time to the processed race results data
+                        if race_session_results_data:
+                            pole_sitter_entry = next((res for res in race_session_results_data if res.get('gridPosition') == 1), None)
+                            if pole_sitter_entry:
+                                pole_driver_code = pole_sitter_entry.get('driverCode')
+                                # --- Add Debug Print Here (Pole Sitter ID) ---
+                                print(f"    -> Identified pole sitter (GridPos=1) as: {pole_driver_code}")
+                                # --- End Debug Print ---
+                                if pole_driver_code in qualifying_times_by_driver:
+                                    pole_time = qualifying_times_by_driver[pole_driver_code]
+                                    pole_sitter_entry['poleLapTimeValue'] = pole_time
+                                    print(f"    -> Added pole time for {pole_driver_code}: {pole_time}")
+                                else:
+                                    print(f"    !! Pole time not found in collected qualifying data for {pole_driver_code}.")
+                            else:
+                                print("    !! Could not identify pole sitter (GridPosition=1) in processed Race results.")
+
+                            # Now save the final Race results with pole time included
+                            race_results_file = races_path / f"{event_slug}_R.json"
+                            save_json(race_session_results_data, race_results_file)
+                            print(f"    -> Saved final Race results (with pole time) to {race_results_file.name}")
+                        else:
+                            print("    !! Processing Race results returned no data.")
+
                     else:
-                         print(f"    -> Chart data already cached for {event_name}.")
-                else:
-                    print(f"    !! No results found for Race session {event_name}")
+                        print(f"    !! No raw results found for Race session {event_name}")
 
-                del race_session # Clean up session object
-            except Exception as race_err:
+                    del race_session # Clean up session object
+                except Exception as race_err:
                     print(f"    !! Error processing race session for {event_name}: {race_err}")
                     # Attempt to save empty file if race results processing failed entirely
                     race_results_file = races_path / f"{event_slug}_R.json"
@@ -635,9 +669,61 @@ def process_season_data(year: int):
                         except Exception as save_err:
                             print(f"    !! Failed to save empty Race results file after error: {save_err}")
 
+            # --- Process Chart Data (using Race session laps if loaded) ---
+            if race_session_laps_data is not None and not race_session_laps_data.empty:
+                print("    -> Processing chart data for Race...")
+                all_drivers_laps = race_session_laps_data['Driver'].unique()
+                # Lap Times
+                if not lap_times_file.exists():
+                    laps_filtered = race_session_laps_data.pick_drivers(all_drivers_laps).pick_accurate().copy()
+                    if not laps_filtered.empty:
+                        laps_filtered.loc[:, 'LapTimeSeconds'] = laps_filtered['LapTime'].dt.total_seconds()
+                        laps_pivot = laps_filtered.pivot_table(index='LapNumber', columns='Driver', values='LapTimeSeconds')
+                        laps_pivot = laps_pivot.reset_index()
+                        save_json(laps_pivot, lap_times_file)
+                # Position Changes
+                if not positions_file.exists():
+                    pos_data = race_session_laps_data[['LapNumber', 'Driver', 'Position']].dropna(subset=['Position'])
+                    if not pos_data.empty:
+                        pos_data['Position'] = pos_data['Position'].astype(int)
+                        pos_pivot = pos_data.pivot_table(index='LapNumber', columns='Driver', values='Position')
+                        pos_pivot = pos_pivot.reset_index()
+                        save_json(pos_pivot, positions_file)
+                # Tire Strategy
+                if not tire_strategy_file.exists():
+                    strategy_list = []
+                    for drv_code in all_drivers_laps:
+                        drv_laps = race_session_laps_data.pick_driver(drv_code)
+                        if drv_laps.empty: continue
+                        stints_grouped = drv_laps.groupby("Stint")
+                        stint_data = []
+                        for stint_num, stint_laps in stints_grouped:
+                            if stint_laps.empty: continue
+                            compound = stint_laps["Compound"].iloc[0]
+                            start_lap = stint_laps["LapNumber"].min()
+                            end_lap = stint_laps["LapNumber"].max()
+                            lap_count = len(stint_laps)
+                            stint_data.append({"compound": compound, "startLap": int(start_lap), "endLap": int(end_lap), "lapCount": int(lap_count)})
+                        if stint_data:
+                            stint_data.sort(key=lambda x: x['startLap'])
+                            strategy_list.append({"driver": drv_code, "stints": stint_data})
+                    save_json(strategy_list, tire_strategy_file)
+                # Session Drivers (using results data from the main race session results)
+                if not session_drivers_file.exists() and race_session_results_data: # Use stored R results
+                    driver_list = [{"code": str(res['driverCode']), "name": res['fullName'], "team": res['team']}
+                                   for res in race_session_results_data if res.get('driverCode')]
+                    driver_list.sort(key=lambda x: x['code'])
+                    save_json(driver_list, session_drivers_file)
+                print(f"    -> Saved chart data for {event_name}.")
+            elif 'R' in final_session_list: # Only print warning if Race was supposed to be processed
+                 print(f"    !! No lap data found for {event_name} Race, skipping chart data generation.")
+            # else: # Don't print if Race wasn't in the list (e.g., error loading schedule)
+                 # print(f"    -> Race session not processed, skipping chart data.")
+
+
             # Add winner to summary list (only from Race session results)
-            if race_session_results_for_charts: # Use the formatted results
-                winner = next((res for res in race_session_results_for_charts if res.get('position') == 1), None)
+            if race_session_results_data: # Use the formatted results
+                winner = next((res for res in race_session_results_data if res.get('position') == 1), None)
                 if winner:
                     all_race_results_summary.append({
                         "year": year, "event": event_name, "round": round_number,

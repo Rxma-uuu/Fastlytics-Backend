@@ -136,8 +136,10 @@ async def get_session_drivers(
     print(f"Received request for session drivers: {year}, {event}, {session}")
     try:
         # Cache key needs to handle event name vs round number if needed
-        event_slug = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
-        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug}_drivers.json" # Assuming processor saves this
+        event_slug_raw = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
+        event_slug_lower = event_slug_raw.lower() # Use lowercase slug for filename
+        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_lower}_drivers.json" # Assuming processor saves this
+        print(f"Attempting to read cache file: {cache_file}") # Add log for debugging path
         cached_drivers = read_json_cache(cache_file)
         if cached_drivers is not None:
             print(f"Returning cached session drivers for {year} {event} {session}.")
@@ -165,8 +167,10 @@ async def get_lap_times(
          raise HTTPException(status_code=400, detail="Please provide 1 to 5 driver codes.")
     try:
         # Cache key needs update if processor saves per-driver data
-        event_slug = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
-        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug}_laptimes.json"
+        event_slug_raw = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
+        event_slug_lower = event_slug_raw.lower() # Use lowercase slug for filename
+        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_lower}_laptimes.json"
+        print(f"Attempting to read cache file: {cache_file}") # Add log for debugging path
         cached_laptimes = read_json_cache(cache_file)
         if cached_laptimes is not None:
              # Filter cached data for requested drivers
@@ -262,8 +266,10 @@ async def get_tire_strategy(
     print(f"Received request for tire strategy: {year}, {event}, {session}")
     try:
         # Cache key needs update
-        event_slug = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
-        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug}_tirestrategy.json"
+        event_slug_raw = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
+        event_slug_lower = event_slug_raw.lower() # Use lowercase slug for filename
+        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_lower}_tirestrategy.json"
+        print(f"Attempting to read cache file: {cache_file}") # Add log for debugging path
         cached_strategy = read_json_cache(cache_file)
         if cached_strategy is not None:
             print(f"Returning cached tire strategy for {year} {event} {session}.")
@@ -288,9 +294,12 @@ async def get_lap_positions(
     if session not in ['R', 'S']:
         raise HTTPException(status_code=400, detail="Position data is only available for Race (R) or Sprint (S) sessions.")
     try:
-        event_slug = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
+        event_slug_raw = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
+        # Ensure the slug used for the filename is lowercase to match filesystem conventions
+        event_slug_lower = event_slug_raw.lower()
         # Cache file name might need session identifier if processor saves separately
-        positions_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug}_positions.json" # Assuming R for now
+        positions_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_lower}_positions.json" # Use lowercase slug
+        print(f"Attempting to read cache file: {positions_file}") # Add log for debugging path
         positions_data = read_json_cache(positions_file)
         if positions_data is None:
             # TODO: Potentially fetch live if cache miss? Or rely on processor.
@@ -375,27 +384,30 @@ async def get_available_sessions(
     """ Retrieves available processed session files (including segments) for a given event. """
     print(f"Received request for available sessions: {year}, {event}")
     try:
-        # --- Determine event_slug (consistent with processor) ---
-        event_slug = None
+        # --- Determine event_slug (consistent with processor, ensure lowercase for file ops) ---
+        event_slug_raw = None
         try:
             # Try converting event to int first (for round number)
             round_num = int(event)
             schedule = ff1.get_event_schedule(year, include_testing=False)
             event_row = schedule[schedule['RoundNumber'] == round_num]
             if not event_row.empty:
-                event_slug = event_row['EventName'].iloc[0].replace(' ', '_')
+                event_slug_raw = event_row['EventName'].iloc[0].replace(' ', '_')
             else:
                  raise HTTPException(status_code=404, detail=f"Event round {event} not found for {year}")
         except ValueError:
             # If not an integer, assume it's an event name
-            event_slug = event.replace(' ', '_')
+            event_slug_raw = event.replace(' ', '_')
             # Optional: Verify event name exists in schedule if needed
             # schedule = ff1.get_event_schedule(year, include_testing=False)
             # if not any(schedule['EventName'] == event):
             #     raise HTTPException(status_code=404, detail=f"Event name '{event}' not found for {year}")
 
-        if not event_slug: # Should not happen if logic above is correct
+        if not event_slug_raw: # Should not happen if logic above is correct
              raise HTTPException(status_code=400, detail="Could not determine event slug.")
+
+        # Use lowercase slug for filesystem operations
+        event_slug_lower = event_slug_raw.lower()
 
         # --- Find available session files ---
         event_results_path = DATA_CACHE_PATH / str(year) / "races"
@@ -416,15 +428,19 @@ async def get_available_sessions(
         # Create ordered list based on the map keys
         session_order = list(session_order_map.keys())
 
-        processed_files = set(f.name for f in event_results_path.glob(f"{event_slug}_*.json"))
+        # Use lowercase slug for globbing
+        processed_files = set(f.name for f in event_results_path.glob(f"{event_slug_lower}_*.json"))
+        print(f"Globbing for files matching: {event_slug_lower}_*.json in {event_results_path}") # Debug log
+        print(f"Found files: {processed_files}") # Debug log
 
         for session_id in session_order:
-            filename = f"{event_slug}_{session_id}.json"
+            # Use lowercase slug for filename check
+            filename = f"{event_slug_lower}_{session_id}.json"
             if filename in processed_files:
-                # Check if we should skip parent Q/SQ if segments exist
-                if session_id == 'Q' and any(f"{event_slug}_Q{i}.json" in processed_files for i in [1, 2, 3]):
+                # Check if we should skip parent Q/SQ if segments exist (using lowercase slug)
+                if session_id == 'Q' and any(f"{event_slug_lower}_q{i}.json" in processed_files for i in [1, 2, 3]):
                     continue # Skip parent Q if Q1/Q2/Q3 exist
-                if session_id == 'SQ' and any(f"{event_slug}_SQ{i}.json" in processed_files for i in [1, 2, 3]):
+                if session_id == 'SQ' and any(f"{event_slug_lower}_sq{i}.json" in processed_files for i in [1, 2, 3]):
                     continue # Skip parent SQ if SQ1/SQ2/SQ3 exist
 
                 available_sessions.append({
@@ -432,7 +448,7 @@ async def get_available_sessions(
                     "type": session_id, # Use the specific identifier (FP1, Q1, R etc.)
                 })
 
-        print(f"Found available processed sessions for {year} {event_slug}: {[s['type'] for s in available_sessions]}")
+        print(f"Found available processed sessions for {year} {event_slug_lower}: {[s['type'] for s in available_sessions]}")
         # Sort based on the predefined order
         available_sessions.sort(key=lambda x: session_order.index(x['type']) if x['type'] in session_order else 99)
         return available_sessions
@@ -455,7 +471,9 @@ async def get_specific_race_result_api(
     try:
         # Corrected session-specific cache file naming
         session_suffix = f"_{session}" # Always include the session suffix
-        race_filename = f"{event_slug.replace('-', '_')}{session_suffix}.json"
+        # Ensure event_slug is lowercase for consistent file naming
+        lowercase_event_slug = event_slug.lower()
+        race_filename = f"{lowercase_event_slug.replace('-', '_')}{session_suffix}.json"
         results_file = DATA_CACHE_PATH / str(year) / "races" / race_filename
         print(f"Attempting to read cache file: {results_file}") # Add log for debugging
         results_data = read_json_cache(results_file)
