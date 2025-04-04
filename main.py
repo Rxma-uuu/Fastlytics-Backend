@@ -131,7 +131,9 @@ async def get_schedule(year: int):
 async def get_session_drivers(
     year: int = Query(..., description="Year of the season", example=2023),
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
-    session: str = Query(default="R", regex="^[RQSF][P123]?$", description="Session type (R, Q, S, FP1, FP2, FP3)")
+    # Temporarily remove regex to test validation
+    session: str = Query(..., description="Session type (e.g., R, Q, S, FP1, FP2, FP3)")
+    # session: str = Query(default="R", regex="^[RQSF][P123]?$", description="Session type (R, Q, S, FP1, FP2, FP3)")
 ):
     """ Retrieves a list of drivers (code, name, team) who participated in a session. """
     print(f"Received request for session drivers: {year}, {event}, {session}")
@@ -164,7 +166,7 @@ async def get_session_drivers(
 async def get_driver_lap_numbers(
     year: int = Query(..., description="Year of the season", example=2023),
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
-    session: str = Query(default="R", regex="^[RQSF][P123]?$", description="Session type"),
+    session: str = Query(..., description="Session type"),
     driver: str = Query(..., min_length=3, max_length=3, description="3-letter driver code")
 ):
     """ Retrieves a list of valid lap numbers for a specific driver in a session. """
@@ -183,7 +185,7 @@ async def get_driver_lap_numbers(
 async def get_lap_times(
     year: int = Query(..., description="Year of the season", example=2023),
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
-    session: str = Query(default="R", regex="^[RQSF][P123]?$", description="Session type"),
+    session: str = Query(..., description="Session type"),
     drivers: list[str] = Query(..., min_length=1, max_length=5, description="List of 1 to 5 driver codes") # Increased max_length to 5
 ):
     """ Retrieves and compares lap times for one to five drivers. """ # Updated docstring
@@ -237,7 +239,7 @@ async def get_lap_times(
 async def get_telemetry_speed(
     year: int = Query(..., description="Year of the season", example=2023),
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
-    session: str = Query(default="R", regex="^[RQSF][P123]?$", description="Session type"),
+    session: str = Query(..., description="Session type"),
     driver: str = Query(..., min_length=3, max_length=3, description="3-letter driver code"),
     lap: str = Query(default="fastest", description="Lap number (integer) or 'fastest'") # Updated description
 ):
@@ -263,7 +265,7 @@ async def get_telemetry_speed(
 async def get_telemetry_gear(
     year: int = Query(..., description="Year of the season", example=2023),
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
-    session: str = Query(default="R", regex="^[RQSF][P123]?$", description="Session type"),
+    session: str = Query(..., description="Session type"),
     driver: str = Query(..., min_length=3, max_length=3, description="3-letter driver code"),
     lap: str = Query(default="fastest", description="Lap number (integer) or 'fastest'") # Updated description
 ):
@@ -289,7 +291,7 @@ async def get_telemetry_gear(
 async def get_sector_comparison(
     year: int = Query(..., description="Year of the season", example=2023),
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
-    session: str = Query(default="R", regex="^[RQSF][P123]?$", description="Session type"),
+    session: str = Query(..., description="Session type"),
     driver1: str = Query(..., min_length=3, max_length=3, description="3-letter code for driver 1"),
     driver2: str = Query(..., min_length=3, max_length=3, description="3-letter code for driver 2"),
     lap1: str = Query(default="fastest", description="Lap identifier for driver 1 (number or 'fastest')"), # Add lap1 param
@@ -318,7 +320,7 @@ async def get_sector_comparison(
 async def get_tire_strategy(
     year: int = Query(..., description="Year of the season", example=2023),
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
-    session: str = Query(default="R", regex="^[RQSF][P123]?$", description="Session type")
+    session: str = Query(..., description="Session type")
 ):
     """ Retrieves tire stint data for all drivers in a session. """
     print(f"Received request for tire strategy: {year}, {event}, {session}")
@@ -349,7 +351,7 @@ async def get_tire_strategy(
 async def get_lap_positions(
     year: int = Query(..., description="Year of the season", example=2023),
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
-    session: str = Query(default="R", regex="^[RS]$", description="Session type (R or S)") # Allow Sprint
+    session: str = Query(..., description="Session type (R or S)")
 ):
     """ Retrieves lap-by-lap position data for all drivers in a race or sprint session from cache. """
     print(f"Received request for cached lap positions: {year}, {event}, {session}")
@@ -531,7 +533,7 @@ async def get_available_sessions(
 async def get_specific_race_result_api(
     year: int,
     event_slug: str,
-    session: str = Query(default="R", regex="^(R|S|Q[123]?|FP[123]|SQ[123]?)$")
+    session: str = Query(...)
 ):
     """ Retrieves results for a specific race or session. """
     print(f"Received request for specific race result: {year}, {event_slug}, {session}")
