@@ -303,13 +303,16 @@ async def get_sector_comparison(
         raise HTTPException(status_code=400, detail="Please select two different drivers.")
     # NOTE: This is live processing, not typically cached.
     try:
-        # Pass lap identifiers to the processing function
+        # Directly call the processing function, passing lap identifiers
+        # Reverting function call and params to previous state for debugging
         comparison_data = data_processing.fetch_and_process_sector_comparison(
             year, event, session, driver1, driver2, lap1_identifier=lap1, lap2_identifier=lap2
         )
         if comparison_data is None:
+            # Revert error message as well
              raise HTTPException(status_code=404, detail=f"Sector comparison data could not be generated for the specified laps (Lap {lap1} vs Lap {lap2}). Check if laps exist and have telemetry.")
         return comparison_data
+    # Revert exception handling block as well
     except Exception as e:
         print(f"Error fetching sector comparison: {e}")
         # Use built-in Exception as per custom instructions

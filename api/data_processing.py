@@ -24,6 +24,17 @@ if not os.path.exists(FASTF1_CACHE_PATH):
     os.makedirs(FASTF1_CACHE_PATH)
 ff1.Cache.enable_cache(FASTF1_CACHE_PATH)
 
+# --- Helper Functions ---
+
+def map_session_identifier_for_load(session_identifier: str) -> str:
+    """Maps session identifiers like Q1, Q2, Q3 to their parent (Q) for ff1.get_session."""
+    if session_identifier in ['Q1', 'Q2', 'Q3']:
+        return 'Q'
+    elif session_identifier in ['SQ1', 'SQ2', 'SQ3']:
+        return 'SQ' # Assuming Sprint Qualifying uses SQ
+    # Add other mappings if needed (e.g., Sprint Shootout)
+    return session_identifier # Return original if not a segment
+
 # Helper to get team color mapping
 def get_team_color_name(team_name: str | None) -> str:
     if not team_name: return 'gray'
@@ -65,7 +76,9 @@ def fetch_session_drivers(year: int, event: str, session_type: str) -> list[dict
     """ Fetches the list of drivers who participated in a session. """
     print(f"Fetching drivers for {year} {event} {session_type}")
     try:
-        session = ff1.get_session(year, event, session_type)
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
         # Removed results=True from load(), results are accessed directly via session.results
         session.load(laps=True, telemetry=False, weather=False, messages=False)
         print("Session loaded for driver list.")
@@ -97,7 +110,9 @@ def fetch_and_process_laptimes_multi(year: int, event: str, session_type: str, d
     print(f"Processing lap times for {driver_codes} - {year} {event} {session_type}")
     if not (2 <= len(driver_codes) <= 3): raise ValueError("Supports 2 or 3 drivers.")
     try:
-        session = ff1.get_session(year, event, session_type)
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
         session.load(laps=True, telemetry=False, weather=False, messages=False)
         laps = session.laps.pick_drivers(driver_codes).pick_accurate()
         if laps.empty: return None
@@ -118,7 +133,9 @@ def fetch_and_process_speed_trace(year: int, event: str, session_type: str, driv
     """ Fetches telemetry for a specific lap and processes speed data. """
     print(f"Processing speed trace for {driver_code} lap {lap_identifier} - {year} {event} {session_type}")
     try:
-        session = ff1.get_session(year, event, session_type)
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
         session.load(laps=True, telemetry=True, weather=False, messages=False)
         # Use pick_drivers instead of pick_driver
         laps = session.laps.pick_drivers([driver_code])
@@ -144,7 +161,9 @@ def fetch_and_process_gear_map(year: int, event: str, session_type: str, driver_
     """ Fetches telemetry for a specific lap and processes X, Y, Gear data. """
     print(f"Processing gear map for {driver_code} lap {lap_identifier} - {year} {event} {session_type}")
     try:
-        session = ff1.get_session(year, event, session_type)
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
         session.load(laps=True, telemetry=True, weather=False, messages=False)
         # Use pick_drivers instead of pick_driver
         laps = session.laps.pick_drivers([driver_code])
@@ -174,7 +193,11 @@ def fetch_and_process_tire_strategy(year: int, event: str, session_type: str) ->
     """ Fetches lap data and extracts tire stint information. """
     print(f"Processing tire strategy - {year} {event} {session_type}")
     try:
-        session = ff1.get_session(year, event, session_type)
+        # Tire strategy often relates to Race or Sprint, mapping might not be needed
+        # but doesn't hurt to add for consistency if segments were ever relevant here.
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
         session.load(laps=True, telemetry=False, weather=False, messages=False)
         laps = session.laps
         if laps.empty: return None
@@ -208,7 +231,9 @@ def fetch_driver_lap_numbers(year: int, event: str, session_type: str, driver_co
     """ Fetches valid lap numbers completed by a specific driver in a session. """
     print(f"Fetching lap numbers for {driver_code} - {year} {event} {session_type}")
     try:
-        session = ff1.get_session(year, event, session_type)
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
         session.load(laps=True, telemetry=False, weather=False, messages=False)
         # Use pick_drivers instead of pick_driver
         laps = session.laps.pick_drivers([driver_code]).pick_accurate() # Pick accurate laps
@@ -269,7 +294,9 @@ def fetch_and_process_sector_comparison(
     """ Fetches telemetry for two drivers for specific laps (or fastest), compares sector times, and generates SVG paths. """
     print(f"Processing sector comparison for {driver1_code} (Lap {lap1_identifier}) vs {driver2_code} (Lap {lap2_identifier}) - {year} {event} {session_type}")
     try:
-        session = ff1.get_session(year, event, session_type)
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
         session.load(laps=True, telemetry=True, weather=False, messages=False)
 
         # Use pick_drivers instead of pick_driver
