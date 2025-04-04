@@ -1,20 +1,21 @@
 import os
 import json
-from pathlib import Path
-from fastapi import FastAPI, HTTPException, Query, Depends, status
+from pathlib import Path  # Keep pathlib.Path for filesystem operations
+import fastapi  # Import the full fastapi module
+from fastapi import FastAPI, HTTPException, Query, Depends, status  # Remove Path alias import
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
-import numpy as np # Keep numpy for NaN replacement if needed by chance
+import numpy as np  # Keep numpy for NaN replacement if needed by chance
 from dotenv import load_dotenv
 import fastf1 as ff1
-import pandas as pd # Import fastf1 for schedule
+import pandas as pd  # Import fastf1 for schedule
 # Re-import data_processing as it's needed again
 from api import data_processing
-import time # Import time for logging
+import time  # Import time for logging
 
 # --- Configuration ---
 load_dotenv()
-script_dir = Path(__file__).resolve().parent # Get script directory
+script_dir = Path(__file__).resolve().parent  # Get script directory
 DATA_CACHE_PATH = script_dir / "data_cache" # Root for our processed JSON
 STATIC_DATA_PATH = script_dir / "static_data" # Root for static JSON files
 FASTF1_CACHE_PATH = os.getenv('FASTF1_CACHE_PATH', script_dir / 'cache') # Needed for ff1 schedule
@@ -135,10 +136,15 @@ async def get_session_drivers(
     """ Retrieves a list of drivers (code, name, team) who participated in a session. """
     print(f"Received request for session drivers: {year}, {event}, {session}")
     try:
-        # Cache key needs to handle event name vs round number if needed
-        event_slug_raw = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
-        event_slug_lower = event_slug_raw.lower() # Use lowercase slug for filename
-        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_lower}_drivers.json" # Assuming processor saves this
+        # Handle event name vs round number AND replace hyphens/spaces consistently
+        if isinstance(event, str) and not event.isdigit():
+            # Replace spaces AND hyphens with underscores for event names
+            event_slug_corrected = event.replace(' ', '_').replace('-', '_').lower()
+        else:
+            # Assume it's a round number, format consistently (lowercase)
+            event_slug_corrected = f"round_{event}".lower() # Processor uses lowercase round_
+        # Assuming processor saves driver lists in charts dir now
+        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_drivers.json"
         print(f"Attempting to read cache file: {cache_file}") # Add log for debugging path
         cached_drivers = read_json_cache(cache_file)
         if cached_drivers is not None:
@@ -154,6 +160,25 @@ async def get_session_drivers(
         raise HTTPException(status_code=500, detail=f"Failed to fetch session drivers: {e}")
 
 
+@app.get("/api/laps/driver", dependencies=[Depends(get_api_key)])
+async def get_driver_lap_numbers(
+    year: int = Query(..., description="Year of the season", example=2023),
+    event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
+    session: str = Query(default="R", regex="^[RQSF][P123]?$", description="Session type"),
+    driver: str = Query(..., min_length=3, max_length=3, description="3-letter driver code")
+):
+    """ Retrieves a list of valid lap numbers for a specific driver in a session. """
+    print(f"Received request for lap numbers: {year}, {event}, {session}, driver={driver}")
+    try:
+        lap_numbers = data_processing.fetch_driver_lap_numbers(year, event, session, driver)
+        if lap_numbers is None: # Should return [] if no laps, None might indicate error upstream
+            raise HTTPException(status_code=404, detail="Could not retrieve lap numbers.")
+        return {"laps": lap_numbers} # Return as a JSON object with a 'laps' key
+    except Exception as e:
+        print(f"Error fetching lap numbers: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch lap numbers: {e}")
+
+
 @app.get("/api/laptimes", dependencies=[Depends(get_api_key)])
 async def get_lap_times(
     year: int = Query(..., description="Year of the season", example=2023),
@@ -166,10 +191,14 @@ async def get_lap_times(
     if not (1 <= len(drivers) <= 5): # Updated validation check
          raise HTTPException(status_code=400, detail="Please provide 1 to 5 driver codes.")
     try:
-        # Cache key needs update if processor saves per-driver data
-        event_slug_raw = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
-        event_slug_lower = event_slug_raw.lower() # Use lowercase slug for filename
-        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_lower}_laptimes.json"
+        # Handle event name vs round number AND replace hyphens/spaces consistently
+        if isinstance(event, str) and not event.isdigit():
+            # Replace spaces AND hyphens with underscores for event names, then lowercase
+            event_slug_corrected = event.replace(' ', '_').replace('-', '_').lower()
+        else:
+            # Assume it's a round number, format consistently (lowercase)
+            event_slug_corrected = f"round_{event}".lower() # Processor uses lowercase round_
+        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_laptimes.json"
         print(f"Attempting to read cache file: {cache_file}") # Add log for debugging path
         cached_laptimes = read_json_cache(cache_file)
         if cached_laptimes is not None:
@@ -185,7 +214,7 @@ async def get_lap_times(
                   print(f"Returning cached lap times for {drivers} in {year} {event} {session}.")
                   return filtered_data
              # If cache hit but drivers seem missing, still return the filtered data or raise error
-             # For simplicity, let's return what we found or raise if nothing matched
+             # For Simplicity, let's return what we found or raise if nothing matched
              if not filtered_data or not any(any(drv in lap for drv in drivers) for lap in filtered_data):
                   print(f"Cache hit, but requested drivers {drivers} not found in {cache_file}")
                   # Raise 404 as the data for *these specific drivers* isn't in the expected format/file
@@ -256,6 +285,35 @@ async def get_telemetry_gear(
         raise HTTPException(status_code=500, detail=f"Failed to fetch gear telemetry: {e}")
 
 
+@app.get("/api/comparison/sectors", dependencies=[Depends(get_api_key)])
+async def get_sector_comparison(
+    year: int = Query(..., description="Year of the season", example=2023),
+    event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
+    session: str = Query(default="R", regex="^[RQSF][P123]?$", description="Session type"),
+    driver1: str = Query(..., min_length=3, max_length=3, description="3-letter code for driver 1"),
+    driver2: str = Query(..., min_length=3, max_length=3, description="3-letter code for driver 2"),
+    lap1: str = Query(default="fastest", description="Lap identifier for driver 1 (number or 'fastest')"), # Add lap1 param
+    lap2: str = Query(default="fastest", description="Lap identifier for driver 2 (number or 'fastest')")  # Add lap2 param
+):
+    """ Retrieves sector/segment comparison data between two drivers for specific laps, including SVG paths. """
+    print(f"Received request for sector comparison: {year}, {event}, {session}, {driver1} (Lap {lap1}) vs {driver2} (Lap {lap2})") # Update log
+    if driver1 == driver2:
+        raise HTTPException(status_code=400, detail="Please select two different drivers.")
+    # NOTE: This is live processing, not typically cached.
+    try:
+        # Pass lap identifiers to the processing function
+        comparison_data = data_processing.fetch_and_process_sector_comparison(
+            year, event, session, driver1, driver2, lap1_identifier=lap1, lap2_identifier=lap2
+        )
+        if comparison_data is None:
+             raise HTTPException(status_code=404, detail=f"Sector comparison data could not be generated for the specified laps (Lap {lap1} vs Lap {lap2}). Check if laps exist and have telemetry.")
+        return comparison_data
+    except Exception as e:
+        print(f"Error fetching sector comparison: {e}")
+        # Use built-in Exception as per custom instructions
+        raise HTTPException(status_code=500, detail=f"Failed to fetch sector comparison: {e}")
+
+
 @app.get("/api/strategy/tires", dependencies=[Depends(get_api_key)])
 async def get_tire_strategy(
     year: int = Query(..., description="Year of the season", example=2023),
@@ -265,10 +323,14 @@ async def get_tire_strategy(
     """ Retrieves tire stint data for all drivers in a session. """
     print(f"Received request for tire strategy: {year}, {event}, {session}")
     try:
-        # Cache key needs update
-        event_slug_raw = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
-        event_slug_lower = event_slug_raw.lower() # Use lowercase slug for filename
-        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_lower}_tirestrategy.json"
+        # Handle event name vs round number AND replace hyphens/spaces consistently
+        if isinstance(event, str) and not event.isdigit():
+            # Replace spaces AND hyphens with underscores for event names, then lowercase
+            event_slug_corrected = event.replace(' ', '_').replace('-', '_').lower()
+        else:
+            # Assume it's a round number, format consistently (lowercase)
+            event_slug_corrected = f"round_{event}".lower() # Processor uses lowercase round_
+        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_tirestrategy.json"
         print(f"Attempting to read cache file: {cache_file}") # Add log for debugging path
         cached_strategy = read_json_cache(cache_file)
         if cached_strategy is not None:
@@ -294,11 +356,16 @@ async def get_lap_positions(
     if session not in ['R', 'S']:
         raise HTTPException(status_code=400, detail="Position data is only available for Race (R) or Sprint (S) sessions.")
     try:
-        event_slug_raw = event.replace(' ', '_') if isinstance(event, str) and not event.isdigit() else f"Round_{event}"
+        # Handle event name vs round number AND replace hyphens/spaces consistently
+        if isinstance(event, str) and not event.isdigit():
+            # Replace spaces AND hyphens with underscores for event names, then lowercase
+            event_slug_corrected = event.replace(' ', '_').replace('-', '_').lower()
+        else:
+            # Assume it's a round number, format consistently (lowercase)
+            event_slug_corrected = f"round_{event}".lower() # Processor uses lowercase round_
         # Ensure the slug used for the filename is lowercase to match filesystem conventions
-        event_slug_lower = event_slug_raw.lower()
         # Cache file name might need session identifier if processor saves separately
-        positions_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_lower}_positions.json" # Use lowercase slug
+        positions_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_positions.json" # Use corrected slug
         print(f"Attempting to read cache file: {positions_file}") # Add log for debugging path
         positions_data = read_json_cache(positions_file)
         if positions_data is None:
@@ -466,171 +533,26 @@ async def get_specific_race_result_api(
     event_slug: str,
     session: str = Query(default="R", regex="^[RQSF][P123]?$")
 ):
-    """ Retrieves detailed results for a specific session from cache. """
-    print(f"Received request for specific session results: {year} / {event_slug} / {session}")
+    """ Retrieves results for a specific race or session. """
+    print(f"Received request for specific race result: {year}, {event_slug}, {session}")
     try:
-        # Corrected session-specific cache file naming
-        session_suffix = f"_{session}" # Always include the session suffix
-        # Ensure event_slug is lowercase for consistent file naming
-        lowercase_event_slug = event_slug.lower()
-        race_filename = f"{lowercase_event_slug.replace('-', '_')}{session_suffix}.json"
-        results_file = DATA_CACHE_PATH / str(year) / "races" / race_filename
-        print(f"Attempting to read cache file: {results_file}") # Add log for debugging
+        # Ensure event_slug is properly formatted (lowercase with underscores)
+        event_slug_lower = event_slug.lower().replace('-', '_')
+        
+        # Use the races directory to fetch session-specific results
+        results_file = DATA_CACHE_PATH / str(year) / "races" / f"{event_slug_lower}_{session}.json"
+        print(f"Looking for race results file: {results_file}")
+        
         results_data = read_json_cache(results_file)
         if results_data is None:
-            # TODO: Fetch live if cache miss?
-            raise HTTPException(status_code=404, detail=f"Detailed results not found for {year} {event_slug.replace('_', ' ')} session {session}. Run processor script.") # Updated error message
-        print(f"Returning detailed results for {year} {event_slug} session {session}")
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Results not available for {year} {event_slug} {session}. Run processor script."
+            )
+        
         return results_data
-    except HTTPException as http_exc: raise http_exc
-    except Exception as e: print(f"Unexpected error: {e}"); raise HTTPException(status_code=500)
-
-
-# --- Track Evolution Analysis Endpoint ---
-@app.get("/api/analysis/track-evolution", dependencies=[Depends(get_api_key)])
-async def get_track_evolution_analysis(
-    year: int = Query(..., description="Year of the season"),
-    event: str = Query(..., description="Event name or Round Number"),
-    session: str = Query(..., regex="^[RQSF][P123]?$", description="Session type (R, Q, S, FP1-3)")
-):
-    """ Analyzes track evolution based on lap times and track temperature. """
-    print(f"Received request for track evolution: {year}, {event}, {session}")
-    start_time = time.time()
-    try:
-        # --- Load Session Data ---
-        try:
-            ff1_session = ff1.get_session(year, event, session)
-            # Load laps with telemetry for potential future enhancements, weather needed for temp
-            ff1_session.load(laps=True, weather=True, telemetry=False, messages=False) # Telemetry=False for now to speed up
-            laps = ff1_session.laps
-            weather_data = ff1_session.weather_data
-        except Exception as load_error:
-            print(f"FastF1 Error loading session {year} {event} {session}: {load_error}")
-            # Use built-in Exception as per custom instructions
-            raise HTTPException(status_code=404, detail=f"Session data not available or failed to load: {load_error}")
-
-        if laps is None or laps.empty:
-             raise HTTPException(status_code=404, detail="No lap data found for this session.")
-        if weather_data is None or weather_data.empty:
-             print(f"Warning: No weather data found for {year} {event} {session}. Track temp will be unavailable.")
-             # Proceed without weather if necessary, or raise error if temp is critical
-             # raise HTTPException(status_code=404, detail="Weather data (for track temp) not found.")
-
-
-        # --- Process Lap Data ---
-        laps_proc = laps.pick_accurate().pick_quicklaps().copy() # Work on a copy
-        if laps_proc.empty:
-             raise HTTPException(status_code=404, detail="No accurate quick laps found for analysis.")
-
-        laps_proc['LapTimeSeconds'] = laps_proc['LapTime'].dt.total_seconds()
-
-        # Filter outliers (using quantiles as in the example)
-        lower_bound = laps_proc['LapTimeSeconds'].quantile(0.05)
-        upper_bound = laps_proc['LapTimeSeconds'].quantile(0.95)
-        laps_proc = laps_proc[(laps_proc['LapTimeSeconds'] > lower_bound) &
-                              (laps_proc['LapTimeSeconds'] < upper_bound)]
-
-        if laps_proc.empty:
-             raise HTTPException(status_code=404, detail="No laps remaining after outlier filtering.")
-
-        # --- Calculate Rolling Averages ---
-        driver_evolution_data = []
-        all_lap_numbers = sorted(laps_proc['LapNumber'].unique())
-
-        for driver in laps_proc['Driver'].unique():
-            driver_laps = laps_proc[laps_proc['Driver'] == driver].sort_values(by='LapNumber')
-            if len(driver_laps) < 5: # Need enough laps for rolling average
-                continue
-
-            # Calculate rolling average (5-lap window, centered)
-            rolling_avg = driver_laps['LapTimeSeconds'].rolling(window=5, center=True, min_periods=1).mean()
-
-            # Create data points for the chart { lap: number, time: number | null }
-            driver_rolling_laps = []
-            # Create a mapping from lap number to the original index for this driver
-            lap_to_index_map = pd.Series(driver_laps.index, index=driver_laps['LapNumber'])
-
-            for lap_num in range(int(driver_laps['LapNumber'].min()), int(driver_laps['LapNumber'].max()) + 1):
-                # Get the original index for this lap number for this driver, if it exists
-                original_index = lap_to_index_map.get(lap_num)
-                lap_time_avg = None
-                if original_index is not None:
-                    # Use the original index to safely get the rolling average value
-                    lap_time_avg = rolling_avg.get(original_index)
-
-                driver_rolling_laps.append({
-                    "lap": lap_num,
-                    "time": round(lap_time_avg, 3) if pd.notna(lap_time_avg) else None
-                })
-
-
-            # Get driver color (handle potential errors if function not available/updated)
-            try:
-                color = data_processing.get_driver_color_map().get(driver, '#808080') # Use helper if exists
-            except AttributeError:
-                 # Fallback if helper doesn't exist or fails
-                 color_map = {'VER': '#1E41FF', 'PER': '#1E41FF', 'HAM': '#6CD3BF', 'RUS': '#6CD3BF', 'LEC': '#FF2800', 'SAI': '#FF2800', 'NOR': '#FF8700', 'PIA': '#FF8700', 'ALO': '#2F9B90', 'STR': '#2F9B90', 'GAS': '#0090FF', 'OCO': '#0090FF', 'ALB': '#00A0DE', 'SAR': '#00A0DE', 'TSU': '#00287D', 'RIC': '#00287D', 'BOT': '#900000', 'ZHO': '#900000', 'MAG': '#B6BABD', 'HUL': '#B6BABD'}
-                 color = color_map.get(driver, '#808080') # Default gray
-
-            driver_evolution_data.append({
-                "code": driver,
-                "color": color,
-                "rollingAverageLaps": driver_rolling_laps
-            })
-
-        # --- Process Track Temperature ---
-        track_temp_data = []
-        if weather_data is not None and not weather_data.empty and 'TrackTemp' in weather_data.columns and 'Time' in weather_data.columns:
-            try:
-                # Set 'Time' as index BEFORE resampling
-                weather_data_indexed = weather_data.set_index('Time')
-                # Resample weather data to 1-second intervals and forward fill missing values (use '1s')
-                weather_resampled = weather_data_indexed.ffill().resample('1s').ffill()
-
-                # Align temperature with lap start times (approximate)
-                laps_with_start = laps_proc[['LapNumber', 'LapStartDate']].dropna().sort_values('LapStartDate')
-
-                for _, lap_row in laps_with_start.iterrows():
-                    lap_num = int(lap_row['LapNumber'])
-                    start_time_lap = lap_row['LapStartDate']
-
-                    # Find the closest weather timestamp (within a tolerance, e.g., 5 seconds)
-                    temp_at_lap_start = weather_resampled['TrackTemp'].asof(start_time_lap, tolerance=pd.Timedelta('5s'))
-
-                    if pd.notna(temp_at_lap_start):
-                        track_temp_data.append({
-                            "lap": lap_num,
-                            "temp": round(temp_at_lap_start, 1)
-                        })
-                # Ensure unique laps and sort
-                track_temp_data = pd.DataFrame(track_temp_data).drop_duplicates(subset=['lap']).sort_values('lap').to_dict('records')
-
-            except Exception as weather_err:
-                print(f"Warning: Error processing weather data: {weather_err}. Temp data might be incomplete.")
-                track_temp_data = [] # Fallback to empty list
-
-        # --- Prepare Response ---
-        response_data = {
-            "drivers": driver_evolution_data,
-            "trackTemperature": track_temp_data
-            # TODO: Add stint comparison and compound evolution results here if implemented
-        }
-
-        print(f"Track evolution analysis complete for {year} {event} {session} ({time.time() - start_time:.3f}s)")
-        return response_data
-
     except HTTPException as http_exc:
-        print(f"HTTP Exception during track evolution: {http_exc.detail}")
         raise http_exc
     except Exception as e:
-        print(f"Error during track evolution analysis for {year} {event} {session}: {e}")
-        import traceback
-        traceback.print_exc() # Print full traceback for debugging
-        # Use built-in Exception as per custom instructions
-        raise HTTPException(status_code=500, detail=f"Failed to analyze track evolution: {e}")
-
-
-# --- Optional: Run directly with uvicorn for simple testing ---
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+        print(f"Error fetching specific race results: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch race results: {e}")

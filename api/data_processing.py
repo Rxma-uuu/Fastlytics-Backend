@@ -8,6 +8,11 @@ from collections import defaultdict
 import os
 import time
 import gc
+from scipy.spatial import cKDTree
+from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt # Needed for plotting utilities
+from matplotlib.collections import LineCollection
+from matplotlib.colors import ListedColormap, BoundaryNorm
 # Removed specific FastF1 exception imports
 # from fastf1.exceptions import SessionNotAvailableError, DataNotLoadedError, FastF1Error
 
@@ -115,7 +120,8 @@ def fetch_and_process_speed_trace(year: int, event: str, session_type: str, driv
     try:
         session = ff1.get_session(year, event, session_type)
         session.load(laps=True, telemetry=True, weather=False, messages=False)
-        laps = session.laps.pick_driver(driver_code)
+        # Use pick_drivers instead of pick_driver
+        laps = session.laps.pick_drivers([driver_code])
         if laps.empty: return None
         target_lap = None
         if lap_identifier.lower() == 'fastest':
@@ -140,7 +146,8 @@ def fetch_and_process_gear_map(year: int, event: str, session_type: str, driver_
     try:
         session = ff1.get_session(year, event, session_type)
         session.load(laps=True, telemetry=True, weather=False, messages=False)
-        laps = session.laps.pick_driver(driver_code)
+        # Use pick_drivers instead of pick_driver
+        laps = session.laps.pick_drivers([driver_code])
         if laps.empty: return None
         target_lap = None
         if lap_identifier.lower() == 'fastest':
@@ -176,7 +183,8 @@ def fetch_and_process_tire_strategy(year: int, event: str, session_type: str) ->
         strategy_list = []
         for drv_code in drivers:
             try:
-                drv_laps = laps.pick_driver(drv_code)
+                # Use pick_drivers instead of pick_driver
+                drv_laps = laps.pick_drivers([drv_code])
                 if drv_laps.empty: continue
                 stints_grouped = drv_laps.groupby("Stint")
                 stint_data = []
@@ -194,6 +202,180 @@ def fetch_and_process_tire_strategy(year: int, event: str, session_type: str) ->
         print(f"Successfully processed tire strategy for {len(strategy_list)} drivers.")
         return strategy_list
     except Exception as e: print(f"Error processing tire strategy: {e}"); raise e
+
+
+def fetch_driver_lap_numbers(year: int, event: str, session_type: str, driver_code: str) -> list[int] | None:
+    """ Fetches valid lap numbers completed by a specific driver in a session. """
+    print(f"Fetching lap numbers for {driver_code} - {year} {event} {session_type}")
+    try:
+        session = ff1.get_session(year, event, session_type)
+        session.load(laps=True, telemetry=False, weather=False, messages=False)
+        # Use pick_drivers instead of pick_driver
+        laps = session.laps.pick_drivers([driver_code]).pick_accurate() # Pick accurate laps
+        if laps.empty:
+            print(f"No accurate laps found for driver {driver_code}.")
+            return [] # Return empty list if no laps
+        # Get unique, sorted lap numbers and convert to standard Python int
+        lap_numbers_np = sorted(laps['LapNumber'].dropna().unique().astype(int))
+        lap_numbers = [int(lap) for lap in lap_numbers_np] # Convert numpy.int64 to int
+        print(f"Found {len(lap_numbers)} lap numbers for {driver_code}.")
+        return lap_numbers
+    except Exception as e:
+        print(f"Error fetching lap numbers for {driver_code}: {e}")
+        raise e
+
+
+def generate_svg_path(points: np.ndarray, scale: float = 1.0, offset_x: float = 0.0, offset_y: float = 0.0) -> str:
+    """Generates an SVG path string from a list of (x, y) points."""
+    if points.shape[0] < 2: return ""
+    path_d = f"M {(points[0, 0] * scale) + offset_x},{(points[0, 1] * scale) + offset_y}"
+    for i in range(1, points.shape[0]):
+        path_d += f" L {(points[i, 0] * scale) + offset_x},{(points[i, 1] * scale) + offset_y}"
+    return path_d
+
+def normalize_coordinates(telemetry_df: pd.DataFrame, viewbox_width: int = 1000, viewbox_height: int = 500, padding: int = 50) -> tuple[pd.DataFrame, float, float, float]:
+    """Normalizes X, Y coordinates to fit within a specified SVG viewbox."""
+    x_min, x_max = telemetry_df['X'].min(), telemetry_df['X'].max()
+    y_min, y_max = telemetry_df['Y'].min(), telemetry_df['Y'].max()
+
+    range_x = x_max - x_min
+    range_y = y_max - y_min
+
+    if range_x == 0 or range_y == 0: # Avoid division by zero if track is a straight line (unlikely)
+        scale = 1.0
+    else:
+        scale_x = (viewbox_width - 2 * padding) / range_x
+        scale_y = (viewbox_height - 2 * padding) / range_y
+        scale = min(scale_x, scale_y) # Use the smaller scale to fit both dimensions
+
+    # Calculate offsets to center the track
+    scaled_width = range_x * scale
+    scaled_height = range_y * scale
+    offset_x = padding + (viewbox_width - 2 * padding - scaled_width) / 2 - (x_min * scale)
+    offset_y = padding + (viewbox_height - 2 * padding - scaled_height) / 2 - (y_min * scale)
+
+    # Apply scaling and offset
+    telemetry_df['X_norm'] = (telemetry_df['X'] * scale) + offset_x
+    telemetry_df['Y_norm'] = (telemetry_df['Y'] * scale) + offset_y
+
+    return telemetry_df, scale, offset_x, offset_y
+
+
+def fetch_and_process_sector_comparison(
+    year: int, event: str, session_type: str,
+    driver1_code: str, driver2_code: str,
+    lap1_identifier: str = 'fastest', lap2_identifier: str = 'fastest' # Add lap identifiers
+) -> dict | None:
+    """ Fetches telemetry for two drivers for specific laps (or fastest), compares sector times, and generates SVG paths. """
+    print(f"Processing sector comparison for {driver1_code} (Lap {lap1_identifier}) vs {driver2_code} (Lap {lap2_identifier}) - {year} {event} {session_type}")
+    try:
+        session = ff1.get_session(year, event, session_type)
+        session.load(laps=True, telemetry=True, weather=False, messages=False)
+
+        # Use pick_drivers instead of pick_driver
+        laps_driver1 = session.laps.pick_drivers([driver1_code])
+        laps_driver2 = session.laps.pick_drivers([driver2_code])
+
+        # --- Get target lap for driver 1 ---
+        if lap1_identifier.lower() == 'fastest':
+            lap1 = laps_driver1.pick_fastest()
+        else:
+            try: lap_num = int(lap1_identifier); lap1 = laps_driver1[laps_driver1['LapNumber'] == lap_num].iloc[0] if not laps_driver1[laps_driver1['LapNumber'] == lap_num].empty else None
+            except (ValueError, IndexError): lap1 = None
+
+        # --- Get target lap for driver 2 ---
+        if lap2_identifier.lower() == 'fastest':
+            lap2 = laps_driver2.pick_fastest()
+        else:
+            try: lap_num = int(lap2_identifier); lap2 = laps_driver2[laps_driver2['LapNumber'] == lap_num].iloc[0] if not laps_driver2[laps_driver2['LapNumber'] == lap_num].empty else None
+            except (ValueError, IndexError): lap2 = None
+
+        # --- Validate laps ---
+        if lap1 is None or pd.isna(lap1['LapTime']):
+            print(f"Lap {lap1_identifier} data not available for driver {driver1_code}.")
+            return None
+        if lap2 is None or pd.isna(lap2['LapTime']):
+            print(f"Lap {lap2_identifier} data not available for driver {driver2_code}.")
+            return None
+
+        # --- Get Telemetry ---
+        tel1 = lap1.get_telemetry().add_distance()
+        tel2 = lap2.get_telemetry().add_distance()
+
+        # --- Validate Telemetry ---
+        if tel1.empty or 'X' not in tel1.columns or 'Y' not in tel1.columns or 'Distance' not in tel1.columns or 'Time' not in tel1.columns:
+             print(f"Telemetry data (X, Y, Distance, Time) missing for lap {lap1_identifier} of driver {driver1_code}.")
+             return None
+        if tel2.empty or 'X' not in tel2.columns or 'Y' not in tel2.columns or 'Distance' not in tel2.columns or 'Time' not in tel2.columns:
+             print(f"Telemetry data (X, Y, Distance, Time) missing for lap {lap2_identifier} of driver {driver2_code}.")
+             return None
+
+        # --- Normalize Coordinates and Generate Base Layout ---
+        # Use telemetry from the first driver for the base layout shape
+        tel1_norm, scale, offset_x, offset_y = normalize_coordinates(tel1.copy())
+        circuit_layout_svg = generate_svg_path(tel1_norm[['X_norm', 'Y_norm']].values, 1.0, 0.0, 0.0) # Already scaled
+
+        # --- Segment the Track (Example: using corners) ---
+        # This is a simplified segmentation. A more robust approach might use sectors or mini-sectors.
+        # FastF1 v3+ might have better ways to get circuit info if available.
+        # For now, let's use distance markers as simple segments.
+        num_segments = 20 # Arbitrary number of segments
+        total_distance = tel1['Distance'].max()
+        segment_length = total_distance / num_segments
+        segment_boundaries = np.linspace(0, total_distance, num_segments + 1)
+
+        # --- Compare Time per Segment ---
+        # Interpolate time based on distance for comparison
+        time_interpolator1 = interp1d(tel1['Distance'], tel1['Time'].dt.total_seconds(), bounds_error=False, fill_value="extrapolate")
+        time_interpolator2 = interp1d(tel2['Distance'], tel2['Time'].dt.total_seconds(), bounds_error=False, fill_value="extrapolate")
+
+        track_sections = []
+        for i in range(num_segments):
+            start_dist = segment_boundaries[i]
+            end_dist = segment_boundaries[i+1]
+
+            # Get telemetry points within this distance segment for driver 1 (for path)
+            segment_tel1 = tel1_norm[(tel1_norm['Distance'] >= start_dist) & (tel1_norm['Distance'] <= end_dist)]
+            if segment_tel1.empty: continue
+
+            # Generate SVG path for this segment
+            segment_path_svg = generate_svg_path(segment_tel1[['X_norm', 'Y_norm']].values, 1.0, 0.0, 0.0) # Already scaled
+
+            # Calculate time taken by each driver for this distance segment
+            time1_start = time_interpolator1(start_dist)
+            time1_end = time_interpolator1(end_dist)
+            time2_start = time_interpolator2(start_dist)
+            time2_end = time_interpolator2(end_dist)
+
+            if pd.isna(time1_start) or pd.isna(time1_end) or pd.isna(time2_start) or pd.isna(time2_end):
+                advantage = None # Cannot compare if interpolation failed
+            else:
+                delta_time1 = time1_end - time1_start
+                delta_time2 = time2_end - time2_start
+                # Advantage: positive means driver 1 is faster (less time), negative means driver 2 is faster
+                advantage = delta_time2 - delta_time1
+
+            track_sections.append({
+                "id": f"segment_{i+1}",
+                "name": f"Segment {i+1}",
+                "type": "sector", # Simplified type
+                "path": segment_path_svg,
+                "driver1Advantage": advantage
+            })
+
+        print(f"Successfully processed sector comparison. Found {len(track_sections)} segments.")
+        return {
+            "sections": track_sections,
+            "driver1Code": driver1_code,
+            "driver2Code": driver2_code,
+            "circuitLayout": circuit_layout_svg
+        }
+
+    except Exception as e:
+        print(f"Error processing sector comparison: {e}")
+        import traceback
+        traceback.print_exc()
+        raise e
 
 
 # --- Standings & Results Processing Functions (for processor.py) ---
