@@ -531,7 +531,7 @@ async def get_available_sessions(
 async def get_specific_race_result_api(
     year: int,
     event_slug: str,
-    session: str = Query(default="R", regex="^[RQSF][P123]?$")
+    session: str = Query(default="R", regex="^(R|S|Q[123]?|FP[123]|SQ[123]?)$")
 ):
     """ Retrieves results for a specific race or session. """
     print(f"Received request for specific race result: {year}, {event_slug}, {session}")
