@@ -9,6 +9,7 @@ import os
 import time
 import gc
 import copy # Add copy for deep copying standings
+import argparse # Added for command-line arguments
 # Removed specific FastF1 exception imports
 
 # --- Configuration ---
@@ -241,8 +242,10 @@ def process_session_results(year: int, round_number: int, session_identifier: st
         # Load messages ONLY if loading Q or SQ parent session for segment processing later
         load_messages = session_to_load in ['Q', 'SQ']
         print(f"    -> Loading laps for {session_identifier}: {load_laps}, Loading messages: {load_messages}")
-        session_obj.load(laps=load_laps, telemetry=False, weather=False, messages=load_messages) # Load messages conditionally
+        # --- RESTORED: Load telemetry=True to enable per-lap fetching --- #
+        session_obj.load(laps=load_laps, telemetry=True, weather=False, messages=load_messages)
 
+        # Assign data after successful load
         results = session_obj.results
         laps_data = session_obj.laps if load_laps else None
 
@@ -396,8 +399,10 @@ def process_session_results(year: int, round_number: int, session_identifier: st
         tire_strategy_file = charts_path / f"{event_slug}_{session_upper}_tirestrategy.json"
         session_drivers_file = charts_path / f"{event_slug}_{session_upper}_drivers.json"
         positions_file = charts_path / f"{event_slug}_{session_upper}_positions.json"
-        # speedtrace_file = charts_path / f"{event_slug}_{session_upper}_speedtrace.json" # Add if/when implemented
-        # gearmap_file = charts_path / f"{event_slug}_{session_upper}_gearmap.json" # Add if/when implemented
+        speedtrace_file = charts_path / f"{event_slug}_{session_upper}_speedtrace.json"
+        gearmap_file = charts_path / f"{event_slug}_{session_upper}_gearmap.json"
+        # Add filenames for other charts (gearmap, circuitcomp) here when implemented
+        # circuitcomp_file = charts_path / f"{event_slug}_{session_identifier}_circuitcomp.json"
 
         # Lap Times (FP, Q Segments, SQ Segments, Sprint, R)
         if laps_data is not None and not laps_data.empty:
@@ -438,36 +443,125 @@ def process_session_results(year: int, round_number: int, session_identifier: st
                 else:
                     print(f"      -> Position chart data already cached for {session_identifier}.")
 
-            # Tire Strategy (Sprint, R)
-            if session_identifier in ['Sprint', 'R']:
-                 if not tire_strategy_file.exists():
-                    try:
-                        print(f"      -> Generating tire strategy chart data for {session_identifier}...")
-                        all_drivers_laps_strat = laps_data['Driver'].unique() # Use a different variable name just in case
-                        strategy_list = []
-                        for drv_code in all_drivers_laps_strat:
-                            drv_laps = laps_data.pick_drivers([drv_code]) # Use pick_drivers
-                            if drv_laps.empty: continue
-                            stints_grouped = drv_laps.groupby("Stint")
-                            stint_data = []
-                            for stint_num, stint_laps in stints_grouped:
-                                if stint_laps.empty: continue
-                                compound = stint_laps["Compound"].iloc[0]
-                                start_lap = stint_laps["LapNumber"].min()
-                                end_lap = stint_laps["LapNumber"].max()
-                                lap_count = len(stint_laps)
-                                stint_data.append({"compound": compound, "startLap": int(start_lap), "endLap": int(end_lap), "lapCount": int(lap_count)})
-                            if stint_data:
-                                stint_data.sort(key=lambda x: x['startLap'])
-                                strategy_list.append({"driver": drv_code, "stints": stint_data})
-                        save_json(strategy_list, tire_strategy_file)
-                        print(f"        -> Saved tire strategy data to {tire_strategy_file.name}")
-                    except Exception as chart_err:
-                        print(f"      !! Error generating tire strategy chart for {session_identifier}: {chart_err}")
-                 else:
-                    print(f"      -> Tire strategy chart data already cached for {session_identifier}.")
+            # --- MODIFIED: Tire Strategy (Attempt for ALL sessions with lap data) --- #
+            # Note: Strategy data might be minimal or nonsensical for FP/Q sessions.
+            # The condition `if session_identifier in ['Sprint', 'R']:` has been removed.
+            if not tire_strategy_file.exists():
+                try:
+                    print(f"      -> Generating tire strategy chart data for {session_identifier}...")
+                    all_drivers_laps_strat = laps_data['Driver'].unique() # Use a different variable name just in case
+                    strategy_list = []
+                    for drv_code in all_drivers_laps_strat:
+                        drv_laps = laps_data.pick_drivers([drv_code]) # Use pick_drivers
+                        if drv_laps.empty: continue
+                        stints_grouped = drv_laps.groupby("Stint")
+                        stint_data = []
+                        for stint_num, stint_laps in stints_grouped:
+                            if stint_laps.empty: continue
+                            compound = stint_laps["Compound"].iloc[0]
+                            start_lap = stint_laps["LapNumber"].min()
+                            end_lap = stint_laps["LapNumber"].max()
+                            lap_count = len(stint_laps)
+                            stint_data.append({"compound": compound, "startLap": int(start_lap), "endLap": int(end_lap), "lapCount": int(lap_count)})
+                        if stint_data:
+                            stint_data.sort(key=lambda x: x['startLap'])
+                            strategy_list.append({"driver": drv_code, "stints": stint_data})
+                    save_json(strategy_list, tire_strategy_file)
+                    print(f"        -> Saved tire strategy data to {tire_strategy_file.name}")
+                except Exception as chart_err:
+                    print(f"      !! Error generating tire strategy chart for {session_identifier}: {chart_err}")
+            else:
+                print(f"      -> Tire strategy chart data already cached for {session_identifier}.")
         else:
              print(f"    !! No lap data available for {session_identifier}, skipping lap-based chart generation.")
+
+        # --- MODIFIED: Speed Trace Chart Data (Fetch Telemetry Per Lap) --- #
+        if laps_data is not None and not laps_data.empty:
+            if not speedtrace_file.exists():
+                try:
+                    print(f"      -> Generating speed trace chart data for {session_identifier}...")
+                    speed_data = {}
+                    # Get fastest lap per driver
+                    drivers = laps_data['Driver'].unique()
+                    for driver_code in drivers:
+                        driver_laps = laps_data.pick_drivers([driver_code]).pick_accurate()
+                        if driver_laps.empty: continue
+                        fastest_lap = driver_laps.pick_fastest()
+                        if fastest_lap is None: continue
+
+                        # Get telemetry for the fastest lap (on-demand)
+                        # Using get_car_data() might be preferred for interpolated/merged data
+                        try:
+                            lap_telemetry = fastest_lap.get_car_data().add_distance()
+                            if not lap_telemetry.empty and 'Speed' in lap_telemetry.columns and 'Distance' in lap_telemetry.columns:
+                                # Select and prepare data for JSON (convert to simple lists)
+                                trace = lap_telemetry[['Distance', 'Speed']].dropna()
+                                speed_data[driver_code] = {
+                                    'distance': trace['Distance'].tolist(),
+                                    'speed': trace['Speed'].tolist()
+                                }
+                        except Exception as tel_err:
+                            print(f"        !! Error getting/processing telemetry for {driver_code} fastest lap: {tel_err}")
+
+                    if speed_data:
+                        save_json(speed_data, speedtrace_file)
+                        print(f"        -> Saved speed trace data to {speedtrace_file.name}")
+                    else:
+                        print(f"        !! No valid speed trace data generated for {session_identifier}.")
+
+                except Exception as chart_err:
+                    print(f"      !! Error generating speed trace chart for {session_identifier}: {chart_err}")
+            else:
+                print(f"      -> Speed trace chart data already cached for {session_identifier}.")
+        elif laps_data is None or laps_data.empty:
+             print(f"    !! Lap data not loaded or empty for {session_identifier}, skipping telemetry-based chart generation.")
+
+        # --- NEW: Gear Map Chart Data (Fetch Telemetry Per Lap) --- #
+        if laps_data is not None and not laps_data.empty:
+            if not gearmap_file.exists():
+                try:
+                    print(f"      -> Generating gear map chart data for {session_identifier}...")
+                    gear_data = {}
+                    drivers = laps_data['Driver'].unique()
+                    for driver_code in drivers:
+                        driver_laps = laps_data.pick_drivers([driver_code]).pick_accurate()
+                        if driver_laps.empty: continue
+                        fastest_lap = driver_laps.pick_fastest()
+                        if fastest_lap is None: continue
+
+                        try:
+                            lap_telemetry = fastest_lap.get_car_data().add_distance()
+                            # Check for required columns: X, Y, nGear (FastF1 often uses nGear)
+                            required_cols = ['X', 'Y', 'nGear', 'Distance'] # Distance may be useful for filtering/ordering
+                            if not lap_telemetry.empty and all(col in lap_telemetry.columns for col in required_cols):
+                                # Select required columns and drop rows where any of them are NaN
+                                trace = lap_telemetry[required_cols].dropna()
+                                gear_data[driver_code] = {
+                                    'x': trace['X'].tolist(),
+                                    'y': trace['Y'].tolist(),
+                                    'gear': trace['nGear'].tolist(),
+                                    'distance': trace['Distance'].tolist() # Include distance
+                                }
+                            else:
+                                 missing_cols = [col for col in required_cols if col not in lap_telemetry.columns]
+                                 if missing_cols:
+                                      print(f"        !! Missing gear map columns for {driver_code} fastest lap: {missing_cols}")
+                                 # else: telemetry was empty or X/Y/nGear were all NaN initially
+
+                        except Exception as tel_err:
+                            print(f"        !! Error getting/processing telemetry for {driver_code} fastest lap (GearMap): {tel_err}")
+
+                    if gear_data:
+                        save_json(gear_data, gearmap_file)
+                        print(f"        -> Saved gear map data to {gearmap_file.name}")
+                    else:
+                        print(f"        !! No valid gear map data generated for {session_identifier}.")
+
+                except Exception as chart_err:
+                    print(f"      !! Error generating gear map chart for {session_identifier}: {chart_err}")
+            else:
+                print(f"      -> Gear map chart data already cached for {session_identifier}.")
+        # No corresponding elif here, laps_data check is sufficient
 
         # Session Drivers (All sessions) - Use processed_results generated earlier in this function
         if not session_drivers_file.exists():
@@ -977,12 +1071,115 @@ def process_season_data(year: int):
 
 # --- Main Execution ---
 if __name__ == "__main__":
-    target_years = [2024] # Add more years if needed
+    # --- Argument Parsing --- #
+    parser = argparse.ArgumentParser(description="Process specific F1 sessions based on year, event, and session IDs.")
+    parser.add_argument("year", type=int, help="The year of the season (e.g., 2024)")
+    parser.add_argument("event", type=str, help="Event identifier (Round number like 5, or name like 'Japanese Grand Prix')")
+    parser.add_argument("sessions", type=str, help="Comma-separated list of session identifiers to process (e.g., 'FP1,FP2', 'Q', 'R')")
+
+    args = parser.parse_args()
+
+    # --- Input Validation --- #
     current_year = datetime.now().year
-    if current_year not in target_years: target_years.append(current_year)
+    if args.year < 1950 or args.year > current_year + 1: # Basic year sanity check
+        print(f"Error: Year {args.year} seems invalid. Please provide a realistic year.")
+        exit(1)
+        
+    if not args.sessions:
+        print("Error: No sessions provided. Please specify sessions using the 'sessions' argument.")
+        exit(1)
 
-    # Process years in reverse order (most recent first)
-    for year in sorted(list(set(target_years)), reverse=False):
-        process_season_data(year) # This function has internal error handling per year
+    # Normalize session identifiers (uppercase, strip whitespace)
+    session_list = [s.strip().upper() for s in args.sessions.split(',') if s.strip()]
+    if not session_list:
+         print("Error: No valid session identifiers found in the provided list.")
+         exit(1)
 
-    print("--- Data processing complete ---") # Ensure this is the final message
+    # --- Resolve Event Identifier to Round Number --- #
+    print(f"\n--- Resolving Event Identifier ---")
+    print(f"Year: {args.year}")
+    print(f"Provided Event Identifier: '{args.event}'")
+    
+    round_number = None
+    event_name_resolved = None
+    try:
+        schedule = ff1.get_event_schedule(args.year, include_testing=False)
+        event_identifier_input = args.event.strip()
+
+        # Try interpreting as round number first
+        try:
+            potential_round = int(event_identifier_input)
+            event_details = schedule.loc[schedule['RoundNumber'] == potential_round]
+            if not event_details.empty:
+                round_number = potential_round
+                event_name_resolved = event_details.iloc[0]['EventName']
+                print(f" -> Identifier interpreted as Round Number: {round_number} ({event_name_resolved})")
+            else:
+                 print(f" -> Identifier '{potential_round}' is numeric but not a valid round number for {args.year}.")
+        except ValueError:
+            # Not a number, treat as name
+            print(f" -> Identifier is not numeric, treating as Event Name: '{event_identifier_input}'")
+
+        # If not resolved as round number, search by name
+        if round_number is None:
+            # Try exact match first (case-insensitive)
+            event_details = schedule.loc[schedule['EventName'].str.fullmatch(event_identifier_input, case=False, na=False)]
+            if event_details.empty:
+                # Try partial match (case-insensitive)
+                print(f" -> No exact name match found for '{event_identifier_input}'. Trying partial match...")
+                event_details = schedule.loc[schedule['EventName'].str.contains(event_identifier_input, case=False, na=False)]
+            
+            if not event_details.empty:
+                 if len(event_details) > 1:
+                     print(f" !! Warning: Found multiple events matching '{event_identifier_input}'. Using the first one.")
+                     print(f"    Matches: {event_details['EventName'].tolist()}")
+                 round_number = event_details.iloc[0]['RoundNumber']
+                 event_name_resolved = event_details.iloc[0]['EventName']
+                 print(f" -> Found matching event by name: '{event_name_resolved}' (Round {round_number})")
+            else:
+                 print(f" !! Error: Could not find any event matching '{event_identifier_input}' for {args.year}.")
+                 exit(1)
+
+    except Exception as e:
+        print(f" !! Error accessing FastF1 schedule for year {args.year}: {e}")
+        exit(1)
+
+    # --- Start Processing Requested Sessions --- #
+    if round_number is not None:
+        print(f"\n--- Starting Targeted Session Processing ---")
+        print(f"Target Year: {args.year}")
+        print(f"Target Event: {event_name_resolved} (Round {round_number})")
+        print(f"Sessions Requested: {session_list}")
+        print(f"FastF1 Cache Path: {FASTF1_CACHE_PATH}")
+        print(f"Data Output Directory Root: {DATA_CACHE_PATH}")
+        print("-" * 40)
+
+        start_time = time.time()
+
+        # Process each requested session using the existing function
+        for session_id in session_list:
+            # Basic validation of session ID format before calling
+            if not session_id or not any(session_id.startswith(prefix) for prefix in ['FP','Q','SQ','R','SPRINT']): # Include potential segment prefixes too
+                 print(f" !! Skipping invalid or unrecognized session identifier: '{session_id}'")
+                 continue
+            # Call the core processing function from the original script
+            process_session_results(args.year, round_number, session_id)
+            gc.collect() # Optional: garbage collect after each session
+
+        end_time = time.time()
+        print("-" * 40)
+        print(f"--- Targeted processing finished in {end_time - start_time:.2f} seconds ---")
+    else:
+         # This case should technically be caught by earlier exits, but as a safeguard:
+         print(" !! Error: Could not determine target event round number. Aborting.")
+
+    # --- Original Season Processing Logic (Commented Out/Removed) --- #
+    # target_years = [2025] # Add more years if needed
+    # current_year = datetime.now().year
+    # if current_year not in target_years: target_years.append(current_year)
+    #
+    # # Process years in reverse order (most recent first)
+    # for year in sorted(list(set(target_years)), reverse=False):
+    #     process_season_data(year) # This function has internal error handling per year
+    #
+    # print("--- Data processing complete ---") # Ensure this is the final message

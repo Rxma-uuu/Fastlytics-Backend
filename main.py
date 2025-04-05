@@ -146,7 +146,7 @@ async def get_session_drivers(
             # Assume it's a round number, format consistently (lowercase)
             event_slug_corrected = f"round_{event}".lower() # Processor uses lowercase round_
         # Assuming processor saves driver lists in charts dir now
-        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_drivers.json"
+        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_{session.upper()}_drivers.json"
         print(f"Attempting to read cache file: {cache_file}") # Add log for debugging path
         cached_drivers = read_json_cache(cache_file)
         if cached_drivers is not None:
@@ -200,7 +200,9 @@ async def get_lap_times(
         else:
             # Assume it's a round number, format consistently (lowercase)
             event_slug_corrected = f"round_{event}".lower() # Processor uses lowercase round_
-        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_laptimes.json"
+        # --- FIX: Include session ID in filename --- #
+        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_{session.upper()}_laptimes.json"
+        # --- END FIX --- #
         print(f"Attempting to read cache file: {cache_file}") # Add log for debugging path
         cached_laptimes = read_json_cache(cache_file)
         if cached_laptimes is not None:
@@ -319,34 +321,41 @@ async def get_sector_comparison(
         raise HTTPException(status_code=500, detail=f"Failed to fetch sector comparison: {e}")
 
 
-@app.get("/api/strategy/tires", dependencies=[Depends(get_api_key)])
+@app.get("/api/strategy", dependencies=[Depends(get_api_key)])
 async def get_tire_strategy(
     year: int = Query(..., description="Year of the season", example=2023),
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
     session: str = Query(..., description="Session type")
 ):
-    """ Retrieves tire stint data for all drivers in a session. """
+    """ Retrieves tire strategy data for all drivers in a session. """
     print(f"Received request for tire strategy: {year}, {event}, {session}")
     try:
-        # Handle event name vs round number AND replace hyphens/spaces consistently
         if isinstance(event, str) and not event.isdigit():
-            # Replace spaces AND hyphens with underscores for event names, then lowercase
             event_slug_corrected = event.replace(' ', '_').replace('-', '_').lower()
         else:
-            # Assume it's a round number, format consistently (lowercase)
-            event_slug_corrected = f"round_{event}".lower() # Processor uses lowercase round_
-        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_tirestrategy.json"
-        print(f"Attempting to read cache file: {cache_file}") # Add log for debugging path
+            event_slug_corrected = f"round_{event}".lower()
+
+        # Construct session-specific cache file path
+        # --- FIX: Ensure consistent UPPERCASE session ID --- #
+        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_{session.upper()}_tirestrategy.json"
+        # --- END FIX --- #
+
+        print(f"Attempting to read tire strategy cache file: {cache_file}")
         cached_strategy = read_json_cache(cache_file)
+
         if cached_strategy is not None:
             print(f"Returning cached tire strategy for {year} {event} {session}.")
             return cached_strategy
+        else:
+            # If cache miss, return empty list instead of 404
+            print(f"Cache miss for tire strategy: {cache_file}. Returning empty list.")
+            return []
 
-        # If not cached, raise error (rely on processor script)
-        print(f"Cache miss for tire strategy: {cache_file}")
-        raise HTTPException(status_code=404, detail=f"Tire strategy data not available for {year} {event} {session}. Run processor script.")
     except Exception as e:
         print(f"Error fetching tire strategy: {e}")
+        # Return empty list on other errors as well?
+        # Or stick with 500 for unexpected errors?
+        # Let's return 500 for now for unexpected issues.
         raise HTTPException(status_code=500, detail=f"Failed to fetch tire strategy: {e}")
 
 
@@ -369,8 +378,9 @@ async def get_lap_positions(
             # Assume it's a round number, format consistently (lowercase)
             event_slug_corrected = f"round_{event}".lower() # Processor uses lowercase round_
         # Ensure the slug used for the filename is lowercase to match filesystem conventions
-        # Cache file name might need session identifier if processor saves separately
-        positions_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_positions.json" # Use corrected slug
+        # --- FIX: Include session ID in filename --- #
+        positions_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_{session.upper()}_positions.json" # Use corrected slug and session ID
+        # --- END FIX --- #
         print(f"Attempting to read cache file: {positions_file}") # Add log for debugging path
         positions_data = read_json_cache(positions_file)
         if positions_data is None:
@@ -542,12 +552,16 @@ async def get_specific_race_result_api(
     print(f"Received request for specific race result: {year}, {event_slug}, {session}")
     try:
         # Ensure event_slug is properly formatted (lowercase with underscores)
-        event_slug_lower = event_slug.lower().replace('-', '_')
-        
-        # Use the races directory to fetch session-specific results
-        results_file = DATA_CACHE_PATH / str(year) / "races" / f"{event_slug_lower}_{session}.json"
+        # --- FIX: Replace spaces *and* hyphens with underscores --- #
+        event_slug_lower = event_slug.lower().replace(' ', '_').replace('-', '_')
+        # --- END FIX --- #
+ 
+         # Use the races directory to fetch session-specific results
+        # --- FIX: Use uppercase session ID consistent with processor for chart files (assuming results are similar) --- #
+        results_file = DATA_CACHE_PATH / str(year) / "races" / f"{event_slug_lower}_{session.upper()}.json"
+        # --- END FIX --- #
         print(f"Looking for race results file: {results_file}")
-        
+ 
         results_data = read_json_cache(results_file)
         if results_data is None:
             raise HTTPException(
