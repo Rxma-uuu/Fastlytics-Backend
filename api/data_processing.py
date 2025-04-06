@@ -236,9 +236,9 @@ def fetch_driver_lap_numbers(year: int, event: str, session_type: str, driver_co
         session = ff1.get_session(year, event, session_to_load)
         session.load(laps=True, telemetry=False, weather=False, messages=False)
         # Use pick_drivers instead of pick_driver
-        laps = session.laps.pick_drivers([driver_code]).pick_accurate() # Pick accurate laps
+        laps = session.laps.pick_drivers([driver_code]) # Removed pick_accurate() to include outlaps
         if laps.empty:
-            print(f"No accurate laps found for driver {driver_code}.")
+            print(f"No laps found for driver {driver_code}.")
             return [] # Return empty list if no laps
         # Get unique, sorted lap numbers and convert to standard Python int
         lap_numbers_np = sorted(laps['LapNumber'].dropna().unique().astype(int))
