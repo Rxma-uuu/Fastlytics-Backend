@@ -488,6 +488,175 @@ def fetch_race_results(year: int) -> list[dict] | None:
         return results_list
     except Exception as e: print(f"Error fetching race results summary for {year}: {e}"); raise e
 
+def fetch_and_process_steering(year: int, event: str, session_type: str, driver_code: str, lap_identifier: str) -> pd.DataFrame | None:
+    """ Fetches telemetry for a specific lap and processes steering data. """
+    print(f"Processing steering data for {driver_code} lap {lap_identifier} - {year} {event} {session_type}")
+    try:
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
+        session.load(laps=True, telemetry=True, weather=False, messages=False)
+        laps = session.laps.pick_drivers([driver_code])
+        if laps.empty: return None
+        target_lap = None
+        if lap_identifier.lower() == 'fastest':
+            target_lap = laps.pick_fastest()
+            if target_lap is None or pd.isna(target_lap['LapTime']): target_lap = laps.iloc[-1] if not laps.empty else None
+        else:
+            try: lap_num = int(lap_identifier); lap_row = laps[laps['LapNumber'] == lap_num]; target_lap = lap_row.iloc[0] if not lap_row.empty else None
+            except (ValueError, IndexError): return None
+        if target_lap is None: return None
+        telemetry = target_lap.get_car_data(pad=1)
+        if telemetry.empty or 'Steer' not in telemetry.columns: return None
+        if 'Distance' not in telemetry.columns: telemetry = telemetry.add_distance()
+        steering_df = telemetry[['Distance', 'Steer']].copy().dropna(subset=['Distance', 'Steer']).replace({np.nan: None})
+        # Rename 'Steer' to 'SteeringWheel' to match the expected column name in the frontend
+        steering_df.rename(columns={'Steer': 'SteeringWheel'}, inplace=True)
+        print(f"Successfully processed steering data for lap {getattr(target_lap, 'LapNumber', 'N/A')}. Records: {len(steering_df)}")
+        return steering_df
+    except Exception as e: print(f"Error processing steering data: {e}"); raise e
+
+def fetch_and_process_throttle(year: int, event: str, session_type: str, driver_code: str, lap_identifier: str) -> pd.DataFrame | None:
+    """ Fetches telemetry for a specific lap and processes throttle data. """
+    print(f"Processing throttle data for {driver_code} lap {lap_identifier} - {year} {event} {session_type}")
+    try:
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
+        session.load(laps=True, telemetry=True, weather=False, messages=False)
+        laps = session.laps.pick_drivers([driver_code])
+        if laps.empty: return None
+        target_lap = None
+        if lap_identifier.lower() == 'fastest':
+            target_lap = laps.pick_fastest()
+            if target_lap is None or pd.isna(target_lap['LapTime']): target_lap = laps.iloc[-1] if not laps.empty else None
+        else:
+            try: lap_num = int(lap_identifier); lap_row = laps[laps['LapNumber'] == lap_num]; target_lap = lap_row.iloc[0] if not lap_row.empty else None
+            except (ValueError, IndexError): return None
+        if target_lap is None: return None
+        telemetry = target_lap.get_car_data(pad=1)
+        if telemetry.empty or 'Throttle' not in telemetry.columns: return None
+        if 'Distance' not in telemetry.columns: telemetry = telemetry.add_distance()
+        throttle_df = telemetry[['Distance', 'Throttle']].copy().dropna(subset=['Distance', 'Throttle']).replace({np.nan: None})
+        print(f"Successfully processed throttle data for lap {getattr(target_lap, 'LapNumber', 'N/A')}. Records: {len(throttle_df)}")
+        return throttle_df
+    except Exception as e: print(f"Error processing throttle data: {e}"); raise e
+
+def fetch_and_process_brake(year: int, event: str, session_type: str, driver_code: str, lap_identifier: str) -> pd.DataFrame | None:
+    """ Fetches telemetry for a specific lap and processes brake data. """
+    print(f"Processing brake data for {driver_code} lap {lap_identifier} - {year} {event} {session_type}")
+    try:
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
+        session.load(laps=True, telemetry=True, weather=False, messages=False)
+        laps = session.laps.pick_drivers([driver_code])
+        if laps.empty: return None
+        target_lap = None
+        if lap_identifier.lower() == 'fastest':
+            target_lap = laps.pick_fastest()
+            if target_lap is None or pd.isna(target_lap['LapTime']): target_lap = laps.iloc[-1] if not laps.empty else None
+        else:
+            try: lap_num = int(lap_identifier); lap_row = laps[laps['LapNumber'] == lap_num]; target_lap = lap_row.iloc[0] if not lap_row.empty else None
+            except (ValueError, IndexError): return None
+        if target_lap is None: return None
+        telemetry = target_lap.get_car_data(pad=1)
+        if telemetry.empty or 'Brake' not in telemetry.columns: return None
+        if 'Distance' not in telemetry.columns: telemetry = telemetry.add_distance()
+        
+        # Get the Brake data
+        brake_df = telemetry[['Distance', 'Brake']].copy().dropna(subset=['Distance', 'Brake']).replace({np.nan: None})
+        
+        # Convert boolean values to percentages (0 or 100)
+        if brake_df['Brake'].dtype == bool:
+            brake_df['Brake'] = brake_df['Brake'].apply(lambda x: 100 if x else 0)
+        
+        print(f"Successfully processed brake data for lap {getattr(target_lap, 'LapNumber', 'N/A')}. Records: {len(brake_df)}")
+        return brake_df
+    except Exception as e: print(f"Error processing brake data: {e}"); raise e
+
+def fetch_and_process_rpm(year: int, event: str, session_type: str, driver_code: str, lap_identifier: str) -> pd.DataFrame | None:
+    """ Fetches telemetry for a specific lap and processes RPM data. """
+    print(f"Processing RPM data for {driver_code} lap {lap_identifier} - {year} {event} {session_type}")
+    try:
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
+        session.load(laps=True, telemetry=True, weather=False, messages=False)
+        laps = session.laps.pick_drivers([driver_code])
+        if laps.empty: return None
+        target_lap = None
+        if lap_identifier.lower() == 'fastest':
+            target_lap = laps.pick_fastest()
+            if target_lap is None or pd.isna(target_lap['LapTime']): target_lap = laps.iloc[-1] if not laps.empty else None
+        else:
+            try: lap_num = int(lap_identifier); lap_row = laps[laps['LapNumber'] == lap_num]; target_lap = lap_row.iloc[0] if not lap_row.empty else None
+            except (ValueError, IndexError): return None
+        if target_lap is None: return None
+        telemetry = target_lap.get_car_data(pad=1)
+        if telemetry.empty or 'RPM' not in telemetry.columns: return None
+        if 'Distance' not in telemetry.columns: telemetry = telemetry.add_distance()
+        rpm_df = telemetry[['Distance', 'RPM']].copy().dropna(subset=['Distance', 'RPM']).replace({np.nan: None})
+        print(f"Successfully processed RPM data for lap {getattr(target_lap, 'LapNumber', 'N/A')}. Records: {len(rpm_df)}")
+        return rpm_df
+    except Exception as e: print(f"Error processing RPM data: {e}"); raise e
+
+def fetch_and_process_drs(year: int, event: str, session_type: str, driver_code: str, lap_identifier: str) -> pd.DataFrame | None:
+    """ Fetches telemetry for a specific lap and processes DRS data. """
+    print(f"Processing DRS data for {driver_code} lap {lap_identifier} - {year} {event} {session_type}")
+    try:
+        session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
+        session = ff1.get_session(year, event, session_to_load)
+        session.load(laps=True, telemetry=True, weather=False, messages=False)
+        
+        # Get target lap
+        laps = session.laps.pick_drivers([driver_code])
+        if laps.empty: return None
+        
+        target_lap = None
+        if lap_identifier.lower() == 'fastest':
+            target_lap = laps.pick_fastest()
+            if target_lap is None or pd.isna(target_lap['LapTime']):
+                target_lap = laps.iloc[-1] if not laps.empty else None
+        else:
+            try:
+                lap_num = int(lap_identifier)
+                target_lap = laps[laps['LapNumber'] == lap_num].iloc[0] if not laps[laps['LapNumber'] == lap_num].empty else None
+            except (ValueError, IndexError):
+                return None
+                
+        if target_lap is None: return None
+        
+        # Get telemetry data
+        telemetry = target_lap.get_telemetry()
+        
+        # Ensure we have the required data
+        if telemetry.empty or 'DRS' not in telemetry.columns:
+            print(f"No DRS data found for {driver_code} lap {lap_identifier}")
+            return None
+            
+        # Add distance if not present
+        if 'Distance' not in telemetry.columns:
+            telemetry = telemetry.add_distance()
+            
+        # Extract only the needed columns
+        drs_df = telemetry[['Distance', 'DRS']].copy()
+        
+        # Clean up missing values
+        drs_df = drs_df.dropna(subset=['Distance', 'DRS'])
+        
+        # Print unique values for debugging
+        unique_vals = drs_df['DRS'].unique()
+        print(f"DRS unique values: {sorted(unique_vals)}")
+        
+        print(f"Successfully processed DRS data for lap {getattr(target_lap, 'LapNumber', 'N/A')}. Records: {len(drs_df)}")
+        return drs_df
+        
+    except Exception as e:
+        print(f"Error processing DRS data: {e}")
+        raise e
+
 # --- Main Execution (for processor.py) ---
 # (Keep __main__ block as is)
 # ...

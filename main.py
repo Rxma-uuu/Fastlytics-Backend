@@ -289,6 +289,126 @@ async def get_telemetry_gear(
         raise HTTPException(status_code=500, detail=f"Failed to fetch gear telemetry: {e}")
 
 
+@app.get("/api/telemetry/steering", dependencies=[Depends(get_api_key)])
+async def get_telemetry_steering(
+    year: int = Query(..., description="Year of the season", example=2023),
+    event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
+    session: str = Query(..., description="Session type"),
+    driver: str = Query(..., min_length=3, max_length=3, description="3-letter driver code"),
+    lap: str = Query(default="fastest", description="Lap number (integer) or 'fastest'")
+):
+    """ Retrieves steering telemetry data for a specific driver lap. """
+    print(f"Received request for steering telemetry: {year}, {event}, {session}, {driver}, lap={lap}")
+    try:
+        steering_data_df = data_processing.fetch_and_process_steering(year, event, session, driver, lap)
+        if steering_data_df is None or steering_data_df.empty:
+             raise HTTPException(status_code=404, detail="Steering telemetry data not found.")
+        result_json = steering_data_df.to_dict(orient='records')
+        return result_json
+    except ValueError as ve:
+        print(f"Invalid lap parameter: {ve}")
+        raise HTTPException(status_code=400, detail=f"Invalid lap parameter: {lap}. Must be 'fastest' or an integer.")
+    except Exception as e:
+        print(f"Error fetching steering telemetry: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch steering telemetry: {e}")
+
+
+@app.get("/api/telemetry/throttle", dependencies=[Depends(get_api_key)])
+async def get_telemetry_throttle(
+    year: int = Query(..., description="Year of the season", example=2023),
+    event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
+    session: str = Query(..., description="Session type"),
+    driver: str = Query(..., min_length=3, max_length=3, description="3-letter driver code"),
+    lap: str = Query(default="fastest", description="Lap number (integer) or 'fastest'")
+):
+    """ Retrieves throttle telemetry data for a specific driver lap. """
+    print(f"Received request for throttle telemetry: {year}, {event}, {session}, {driver}, lap={lap}")
+    try:
+        throttle_data_df = data_processing.fetch_and_process_throttle(year, event, session, driver, lap)
+        if throttle_data_df is None or throttle_data_df.empty:
+             raise HTTPException(status_code=404, detail="Throttle telemetry data not found.")
+        result_json = throttle_data_df.to_dict(orient='records')
+        return result_json
+    except ValueError as ve:
+        print(f"Invalid lap parameter: {ve}")
+        raise HTTPException(status_code=400, detail=f"Invalid lap parameter: {lap}. Must be 'fastest' or an integer.")
+    except Exception as e:
+        print(f"Error fetching throttle telemetry: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch throttle telemetry: {e}")
+
+
+@app.get("/api/telemetry/brake", dependencies=[Depends(get_api_key)])
+async def get_telemetry_brake(
+    year: int = Query(..., description="Year of the season", example=2023),
+    event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
+    session: str = Query(..., description="Session type"),
+    driver: str = Query(..., min_length=3, max_length=3, description="3-letter driver code"),
+    lap: str = Query(default="fastest", description="Lap number (integer) or 'fastest'")
+):
+    """ Retrieves brake telemetry data for a specific driver lap. """
+    print(f"Received request for brake telemetry: {year}, {event}, {session}, {driver}, lap={lap}")
+    try:
+        brake_data_df = data_processing.fetch_and_process_brake(year, event, session, driver, lap)
+        if brake_data_df is None or brake_data_df.empty:
+             raise HTTPException(status_code=404, detail="Brake telemetry data not found.")
+        result_json = brake_data_df.to_dict(orient='records')
+        return result_json
+    except ValueError as ve:
+        print(f"Invalid lap parameter: {ve}")
+        raise HTTPException(status_code=400, detail=f"Invalid lap parameter: {lap}. Must be 'fastest' or an integer.")
+    except Exception as e:
+        print(f"Error fetching brake telemetry: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch brake telemetry: {e}")
+
+
+@app.get("/api/telemetry/rpm", dependencies=[Depends(get_api_key)])
+async def get_telemetry_rpm(
+    year: int = Query(..., description="Year of the season", example=2023),
+    event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
+    session: str = Query(..., description="Session type"),
+    driver: str = Query(..., min_length=3, max_length=3, description="3-letter driver code"),
+    lap: str = Query(default="fastest", description="Lap number (integer) or 'fastest'")
+):
+    """ Retrieves RPM telemetry data for a specific driver lap. """
+    print(f"Received request for RPM telemetry: {year}, {event}, {session}, {driver}, lap={lap}")
+    try:
+        rpm_data_df = data_processing.fetch_and_process_rpm(year, event, session, driver, lap)
+        if rpm_data_df is None or rpm_data_df.empty:
+             raise HTTPException(status_code=404, detail="RPM telemetry data not found.")
+        result_json = rpm_data_df.to_dict(orient='records')
+        return result_json
+    except ValueError as ve:
+        print(f"Invalid lap parameter: {ve}")
+        raise HTTPException(status_code=400, detail=f"Invalid lap parameter: {lap}. Must be 'fastest' or an integer.")
+    except Exception as e:
+        print(f"Error fetching RPM telemetry: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch RPM telemetry: {e}")
+
+
+@app.get("/api/telemetry/drs", dependencies=[Depends(get_api_key)])
+async def get_telemetry_drs(
+    year: int = Query(..., description="Year of the season", example=2023),
+    event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
+    session: str = Query(..., description="Session type"),
+    driver: str = Query(..., min_length=3, max_length=3, description="3-letter driver code"),
+    lap: str = Query(default="fastest", description="Lap number (integer) or 'fastest'")
+):
+    """ Retrieves DRS telemetry data for a specific driver lap. """
+    print(f"Received request for DRS telemetry: {year}, {event}, {session}, {driver}, lap={lap}")
+    try:
+        drs_data_df = data_processing.fetch_and_process_drs(year, event, session, driver, lap)
+        if drs_data_df is None or drs_data_df.empty:
+             raise HTTPException(status_code=404, detail="DRS telemetry data not found.")
+        result_json = drs_data_df.to_dict(orient='records')
+        return result_json
+    except ValueError as ve:
+        print(f"Invalid lap parameter: {ve}")
+        raise HTTPException(status_code=400, detail=f"Invalid lap parameter: {lap}. Must be 'fastest' or an integer.")
+    except Exception as e:
+        print(f"Error fetching DRS telemetry: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch DRS telemetry: {e}")
+
+
 @app.get("/api/comparison/sectors", dependencies=[Depends(get_api_key)])
 async def get_sector_comparison(
     year: int = Query(..., description="Year of the season", example=2023),
