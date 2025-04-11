@@ -105,69 +105,6 @@ def fetch_session_drivers(year: int, event: str, session_type: str) -> list[dict
         raise e # Re-raise for the API endpoint to handle
 
 
-# Remove Stint Analysis processing function
-# def fetch_and_process_stint_analysis(year: int, event: str, session_type: str) -> list[dict] | None:
-#     """ Fetches lap data and processes detailed stint information including lap times. """
-#     print(f"Processing stint analysis - {year} {event} {session_type}")
-#     try:
-#         session_to_load = map_session_identifier_for_load(session_type)
-#         print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
-#         session = ff1.get_session(year, event, session_to_load)
-#         session.load(laps=True, telemetry=False, weather=False, messages=False)
-#         laps = session.laps
-#         if laps.empty:
-#             print(f"No lap data found for {year} {event} {session_type}.")
-#             return []
-#
-#         drivers = laps['Driver'].unique()
-#         if len(drivers) == 0: return []
-#
-#         stint_analysis_list = []
-#         for drv_code in drivers:
-#             try:
-#                 # Use pick_drivers instead of pick_driver
-#                 drv_laps = laps.pick_drivers([drv_code])
-#                 if drv_laps.empty: continue
-#
-#                 # Ensure LapTime is converted to seconds
-#                 if 'LapTimeSeconds' not in drv_laps.columns:
-#                     drv_laps['LapTimeSeconds'] = drv_laps['LapTime'].dt.total_seconds()
-#
-#                 # Group by Stint
-#                 stints_grouped = drv_laps.groupby("Stint")
-#
-#                 for stint_num, stint_laps_df in stints_grouped:
-#                     if stint_laps_df.empty: continue
-#
-#                     compound = stint_laps_df["Compound"].iloc[0]
-#                     start_lap = stint_laps_df["LapNumber"].min()
-#                     end_lap = stint_laps_df["LapNumber"].max()
-#                    
-#                     # Extract lap times (in seconds) for this specific stint, handling potential NaNs
-#                     lap_times_seconds = stint_laps_df['LapTimeSeconds'].dropna().tolist()
-#
-#                     stint_analysis_list.append({
-#                         "driverCode": drv_code,
-#                         "stintNumber": int(stint_num),
-#                         "compound": compound,
-#                         "startLap": int(start_lap),
-#                         "endLap": int(end_lap),
-#                         "lapTimes": lap_times_seconds # List of lap times in seconds
-#                     })
-#             except Exception as inner_e:
-#                 print(f"Error processing stint analysis for driver {drv_code}: {inner_e}")
-#                 import traceback
-#                 traceback.print_exc()
-#
-#         print(f"Successfully processed stint analysis for {len(drivers)} drivers.")
-#         return stint_analysis_list
-#     except Exception as e:
-#         print(f"Error processing stint analysis: {e}")
-#         import traceback
-#         traceback.print_exc()
-#         raise e
-
-
 def fetch_and_process_laptimes_multi(year: int, event: str, session_type: str, driver_codes: list[str]) -> pd.DataFrame | None:
     """ Fetches and processes lap times for multiple drivers (2 or 3). """
     print(f"Processing lap times for {driver_codes} - {year} {event} {session_type}")
