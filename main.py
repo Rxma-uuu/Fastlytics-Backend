@@ -447,36 +447,59 @@ async def get_tire_strategy(
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
     session: str = Query(..., description="Session type")
 ):
-    """ Retrieves tire strategy data for all drivers in a session. """
+    """ Retrieves tire strategy (stint info) for all drivers in a session. """
     print(f"Received request for tire strategy: {year}, {event}, {session}")
     try:
-        if isinstance(event, str) and not event.isdigit():
-            event_slug_corrected = event.replace(' ', '_').replace('-', '_').lower()
-        else:
-            event_slug_corrected = f"round_{event}".lower()
-
-        # Construct session-specific cache file path
-        # --- FIX: Ensure consistent UPPERCASE session ID --- #
-        cache_file = DATA_CACHE_PATH / str(year) / "charts" / f"{event_slug_corrected}_{session.upper()}_tirestrategy.json"
-        # --- END FIX --- #
-
-        print(f"Attempting to read tire strategy cache file: {cache_file}")
-        cached_strategy = read_json_cache(cache_file)
-
-        if cached_strategy is not None:
-            print(f"Returning cached tire strategy for {year} {event} {session}.")
-            return cached_strategy
-        else:
-            # If cache miss, return empty list instead of 404
-            print(f"Cache miss for tire strategy: {cache_file}. Returning empty list.")
-            return []
-
+        strategy_data = data_processing.fetch_and_process_tire_strategy(year, event, session)
+        if strategy_data is None: # Could be empty list if session valid but no data
+             raise HTTPException(status_code=404, detail="Tire strategy data not found or session invalid.")
+        return strategy_data
     except Exception as e:
         print(f"Error fetching tire strategy: {e}")
-        # Return empty list on other errors as well?
-        # Or stick with 500 for unexpected errors?
-        # Let's return 500 for now for unexpected issues.
         raise HTTPException(status_code=500, detail=f"Failed to fetch tire strategy: {e}")
+
+
+@app.get("/api/incidents", dependencies=[Depends(get_api_key)])
+async def get_session_incidents(
+    year: int = Query(..., description="Year of the season"),
+    event: str = Query(..., description="Event name or Round Number"),
+    session: str = Query(..., description="Session type (R, Q, S, etc.)")
+):
+    """ Retrieves incident periods (SC, VSC, Red Flag) for a session. """
+    print(f"Received request for incidents: {year}, {event}, {session}")
+    try:
+        incident_data = data_processing.fetch_session_incidents(year, event, session)
+        # fetch_session_incidents handles errors internally and returns [], so no need to check for None
+        return incident_data
+    except Exception as e:
+        print(f"Error processing incidents request: {e}")
+        # import traceback # Optional
+        # traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch session incidents: {e}")
+
+
+@app.get("/api/circuit-comparison", dependencies=[Depends(get_api_key)])
+async def get_circuit_comparison(
+    year: int = Query(..., description="Year of the season", example=2023),
+    event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
+    session: str = Query(..., description="Session type"),
+    driver1: str = Query(..., min_length=3, max_length=3, description="3-letter driver code 1"),
+    driver2: str = Query(..., min_length=3, max_length=3, description="3-letter driver code 2"),
+    lap1: str = Query(default="fastest", description="Lap identifier for driver 1 (number or 'fastest')"),
+    lap2: str = Query(default="fastest", description="Lap identifier for driver 2 (number or 'fastest')")
+):
+    """ Retrieves sector comparison data and SVG paths for two drivers on specific laps. """
+    print(f"Received request for circuit comparison: {year}, {event}, {session}, {driver1} (Lap {lap1}) vs {driver2} (Lap {lap2})")
+    if driver1 == driver2 and lap1 == lap2:
+        raise HTTPException(status_code=400, detail="Cannot compare the same driver on the same lap.")
+    try:
+        comparison_data = data_processing.fetch_and_process_sector_comparison(year, event, session, driver1, driver2, lap1, lap2)
+        if comparison_data is None:
+             raise HTTPException(status_code=404, detail="Circuit comparison data not available for the selected drivers/laps.")
+        return comparison_data
+    except Exception as e:
+        print(f"Error fetching circuit comparison: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch circuit comparison: {e}")
 
 
 @app.get("/api/lapdata/positions", dependencies=[Depends(get_api_key)])

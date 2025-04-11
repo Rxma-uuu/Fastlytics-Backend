@@ -6,3 +6,5 @@ python-dotenv
 gunicorn # To load .env file for backend if needed (e.g., for REDIS_URL)
 # Add other dependencies like redis if you plan to use it for caching
 # redis
+pytest # Testing framework
+httpx # Required by FastAPI's TestClient
