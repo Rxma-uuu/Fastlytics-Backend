@@ -718,3 +718,35 @@ async def get_specific_race_result_api(
     except Exception as e:
         print(f"Error fetching specific race results: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch race results: {e}")
+
+@app.get("/api/tire-strategy", dependencies=[Depends(get_api_key)])
+async def get_tire_strategy(
+    year: int = Query(..., description="Year of the season", example=2023),
+    event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
+    session: str = Query(..., description="Session type")
+):
+    # ... endpoint code ...
+    pass
+
+# Restore the Stint Analysis endpoint
+@app.get("/api/stint-analysis", dependencies=[Depends(get_api_key)])
+async def get_stint_analysis(
+    year: int = Query(..., description="Year of the season", example=2023),
+    event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
+    session: str = Query(..., description="Session type")
+):
+    """ Retrieves detailed stint analysis data including lap times for each stint. """
+    print(f"Received request for stint analysis: {year}, {event}, {session}")
+    try:
+        stint_data = data_processing.fetch_and_process_stint_analysis(year, event, session)
+        if stint_data is None:
+            raise HTTPException(status_code=404, detail="Stint analysis data not found or session invalid.")
+        if not stint_data:
+             print(f"Returning empty list for stint analysis: {year} {event} {session}")
+             # Return 200 with empty list if processing was successful but yielded no stints
+        return stint_data
+    except Exception as e:
+        print(f"Error fetching stint analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch stint analysis: {e}")
