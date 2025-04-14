@@ -447,12 +447,12 @@ async def get_tire_strategy(
     event: str = Query(..., description="Event name or Round Number", example="Bahrain Grand Prix"),
     session: str = Query(..., description="Session type")
 ):
-    """ Retrieves tire strategy (stint info) for all drivers in a session. """
+    """ Retrieves tire stint data for all drivers in a session. """
     print(f"Received request for tire strategy: {year}, {event}, {session}")
     try:
         strategy_data = data_processing.fetch_and_process_tire_strategy(year, event, session)
-        if strategy_data is None: # Could be empty list if session valid but no data
-             raise HTTPException(status_code=404, detail="Tire strategy data not found or session invalid.")
+        if strategy_data is None:
+            raise HTTPException(status_code=404, detail="Tire strategy data not available or failed to process.")
         return strategy_data
     except Exception as e:
         print(f"Error fetching tire strategy: {e}")
@@ -460,22 +460,60 @@ async def get_tire_strategy(
 
 
 @app.get("/api/incidents", dependencies=[Depends(get_api_key)])
-async def get_session_incidents(
+async def get_session_incidents_and_results(
     year: int = Query(..., description="Year of the season"),
     event: str = Query(..., description="Event name or Round Number"),
     session: str = Query(..., description="Session type (R, Q, S, etc.)")
 ):
-    """ Retrieves incident periods (SC, VSC, Red Flag) for a session. """
-    print(f"Received request for incidents: {year}, {event}, {session}")
+    """ Fetches incident messages AND results (official or provisional) for a session. """
+    start_time = time.time()
+    print(f"Received request for incidents & results: {year}, {event}, {session}")
     try:
-        incident_data = data_processing.fetch_session_incidents(year, event, session)
-        # fetch_session_incidents handles errors internally and returns [], so no need to check for None
-        return incident_data
+        # Call the updated function that returns both incidents and results
+        incidents_list, results_df = data_processing.fetch_session_incidents_and_results(year, event, session)
+
+        # Handle potential None DataFrame (if processing failed entirely)
+        results_list = []
+        if results_df is not None and not results_df.empty:
+            # Convert DataFrame to list of dicts, replacing NaN/NaT with None for JSON
+             results_df_processed = results_df.replace({pd.NA: None, np.nan: None})
+             # Convert Timestamps/Timedeltas to string if necessary
+             if 'Time' in results_df_processed.columns:
+                 results_df_processed['Time'] = results_df_processed['Time'].astype(str)
+
+             results_list = results_df_processed.to_dict(orient='records')
+        elif results_df is not None: # It's an empty DataFrame
+             print("Results DataFrame is empty, returning empty list for results.")
+        else:
+             print("Results DataFrame was None, returning empty list for results.")
+             # Optionally, could raise 404 if results are critical and missing?
+
+        # incidents_list should already be a list[dict]
+        if incidents_list is None:
+            print("Incidents list was None, returning empty list.")
+            incidents_list = []
+
+        end_time = time.time()
+        print(f"Incidents & results request processed in {end_time - start_time:.2f} seconds. Returning {len(incidents_list)} incidents, {len(results_list)} results.")
+
+        # Return both incidents and results in a structured response
+        return {
+            "incidents": incidents_list,
+            "results": results_list
+        }
+
+    except ff1.ErgastUnavailableError as e:
+        print(f"ErgastUnavailableError fetching incidents/results: {e}")
+        # Maybe return a specific error structure?
+        raise HTTPException(status_code=503, detail=f"Official data source (Ergast) is unavailable: {e}")
+    except ff1.FastF1Error as f1_error:
+        print(f"FastF1Error fetching incidents/results: {f1_error}")
+        raise HTTPException(status_code=500, detail=f"Internal FastF1 error: {f1_error}")
     except Exception as e:
-        print(f"Error processing incidents request: {e}")
-        # import traceback # Optional
-        # traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to fetch session incidents: {e}")
+        print(f"Unexpected error fetching incidents/results: {e}")
+        import traceback
+        traceback.print_exc() # Log full traceback for unexpected errors
+        raise HTTPException(status_code=500, detail=f"Failed to fetch incidents and results: {e}")
 
 
 @app.get("/api/circuit-comparison", dependencies=[Depends(get_api_key)])

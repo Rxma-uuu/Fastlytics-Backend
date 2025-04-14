@@ -602,128 +602,305 @@ def fetch_and_process_rpm(year: int, event: str, session_type: str, driver_code:
     except Exception as e: print(f"Error processing RPM data: {e}"); raise e
 
 def fetch_and_process_drs(year: int, event: str, session_type: str, driver_code: str, lap_identifier: str) -> pd.DataFrame | None:
-    """ Fetches telemetry for a specific lap and processes DRS data. """
+    """ Fetches telemetry for a specific lap and processes DRS activation data. """
     print(f"Processing DRS data for {driver_code} lap {lap_identifier} - {year} {event} {session_type}")
     try:
         session_to_load = map_session_identifier_for_load(session_type)
         print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
         session = ff1.get_session(year, event, session_to_load)
         session.load(laps=True, telemetry=True, weather=False, messages=False)
-        
-        # Get target lap
+
+        # Use pick_drivers instead of pick_driver
         laps = session.laps.pick_drivers([driver_code])
-        if laps.empty: return None
-        
+        if laps.empty:
+            print(f"No laps found for driver {driver_code}.")
+            return None
+
         target_lap = None
         if lap_identifier.lower() == 'fastest':
             target_lap = laps.pick_fastest()
+            # Fallback if fastest lap is incomplete or has no time
             if target_lap is None or pd.isna(target_lap['LapTime']):
-                target_lap = laps.iloc[-1] if not laps.empty else None
+                print(f"Fastest lap not usable for {driver_code}, falling back to last completed lap.")
+                # Try finding the last lap with a recorded LapTime
+                valid_laps = laps.dropna(subset=['LapTime'])
+                target_lap = valid_laps.iloc[-1] if not valid_laps.empty else None
+                if target_lap is None: # If still no valid lap, try the absolute last lap row
+                     target_lap = laps.iloc[-1] if not laps.empty else None
+
         else:
             try:
                 lap_num = int(lap_identifier)
-                target_lap = laps[laps['LapNumber'] == lap_num].iloc[0] if not laps[laps['LapNumber'] == lap_num].empty else None
+                lap_row = laps[laps['LapNumber'] == lap_num]
+                target_lap = lap_row.iloc[0] if not lap_row.empty else None
             except (ValueError, IndexError):
+                print(f"Invalid lap identifier '{lap_identifier}' or lap not found.")
                 return None
-                
-        if target_lap is None: return None
-        
-        # Get telemetry data
-        telemetry = target_lap.get_telemetry()
-        
-        # Ensure we have the required data
-        if telemetry.empty or 'DRS' not in telemetry.columns:
-            print(f"No DRS data found for {driver_code} lap {lap_identifier}")
+
+        if target_lap is None:
+            print(f"Could not determine target lap for {driver_code}, identifier: {lap_identifier}.")
             return None
-            
-        # Add distance if not present
+
+        lap_number_for_log = getattr(target_lap, 'LapNumber', 'N/A')
+        print(f" -> Target lap identified: {lap_number_for_log}")
+
+        telemetry = target_lap.get_car_data()
+        if telemetry.empty or 'DRS' not in telemetry.columns:
+            print(f"DRS telemetry data not found for lap {lap_number_for_log}.")
+            return None
+
         if 'Distance' not in telemetry.columns:
             telemetry = telemetry.add_distance()
-            
-        # Extract only the needed columns
-        drs_df = telemetry[['Distance', 'DRS']].copy()
-        
-        # Clean up missing values
-        drs_df = drs_df.dropna(subset=['Distance', 'DRS'])
-        
-        # Print unique values for debugging
-        unique_vals = drs_df['DRS'].unique()
-        print(f"DRS unique values: {sorted(unique_vals)}")
-        
-        print(f"Successfully processed DRS data for lap {getattr(target_lap, 'LapNumber', 'N/A')}. Records: {len(drs_df)}")
-        return drs_df
-        
+
+        # Filter for DRS activation points (where DRS value changes, focusing on activation 10, 12, 14)
+        # Consider only points where DRS is active (values 10, 12, 14 usually mean enabled in zones)
+        # We need Distance and the DRS status
+        drs_data = telemetry[['Distance', 'DRS']].dropna()
+
+        # Simplified: return points where DRS is likely active (>= 10 is a common indicator)
+        drs_active_points = drs_data[drs_data['DRS'] >= 8] # Use 8 as threshold based on FastF1 examples
+
+        if drs_active_points.empty:
+             print(f"No DRS activation points found for lap {lap_number_for_log}.")
+             return pd.DataFrame() # Return empty DataFrame
+
+        # Convert to expected format if needed, here returning Distance and DRS value
+        final_drs_df = drs_active_points[['Distance', 'DRS']].copy()
+        final_drs_df['DRS_Active'] = 1 # Simple flag indicating DRS was active at this point
+
+        print(f"Successfully processed DRS data for lap {lap_number_for_log}. Active points: {len(final_drs_df)}")
+        # Return distance and a flag indicating DRS was active
+        return final_drs_df[['Distance', 'DRS_Active']].replace({np.nan: None})
+
     except Exception as e:
         print(f"Error processing DRS data: {e}")
+        import traceback
+        traceback.print_exc()
         raise e
 
-def fetch_session_incidents(year: int, event: str, session_type: str) -> list[dict]:
-    """ Fetches laps associated with Safety Car (SC/VSC) or Red Flag conditions. """
-    print(f"Fetching incidents for {year} {event} {session_type}")
-    incidents = []
+def fetch_session_incidents_and_results(year: int, event: str, session_type: str) -> tuple[list[dict], pd.DataFrame | None]:
+    """
+    Fetches incident messages for a session AND the official or provisional race results.
+    If official results (session.results) are not available, it calculates
+    provisional results based on lap timing data.
+    Returns a tuple: (list_of_incidents, results_dataframe).
+    The results DataFrame will have a 'Provisional' boolean column.
+    """
+    print(f"Fetching incidents and results for {year} {event} {session_type}")
     try:
         session_to_load = map_session_identifier_for_load(session_type)
+        print(f" -> Mapped session type {session_type} to {session_to_load} for loading")
         session = ff1.get_session(year, event, session_to_load)
-        session.load(laps=True, telemetry=False, weather=False, messages=False) # Laps are needed
-        
-        laps = session.laps
-        if laps.empty or 'TrackStatus' not in laps.columns:
-            print("No laps or TrackStatus column found for incident analysis.")
-            return []
 
-        current_incident = None
-        # TrackStatus codes: 1=Green, 2=Yellow, 4=SC, 5=Red, 6=VSC deployed, 7=VSC ending
-        sc_vsc_codes = ['4', '6'] # Safety Car or VSC deployed
-        red_flag_code = '5'
+        # Load necessary data: laps are crucial for fallback, messages for incidents.
+        # Results are loaded implicitly if available by fastf1 when accessing session.results
+        session.load(laps=True, messages=True, weather=False, telemetry=False)
+        print("Session data loaded (laps, messages).")
 
-        # Iterate through laps to find continuous incident periods
-        # Using .iterlaps() might be safer if available and provides lap objects
-        for lap_num, lap_data in laps.groupby('LapNumber'):
-            # Check track status across all drivers for that lap (most common status)
-            # FastF1 might already aggregate this, check documentation if needed.
-            # Simple approach: Check if any driver had the status on that lap.
-            lap_statuses = lap_data['TrackStatus'].astype(str).unique()
+        # --- Get Results (Official or Provisional) ---
+        results_df = session.results
+        provisional = False
 
-            is_sc_vsc = any(status in sc_vsc_codes for status in lap_statuses)
-            is_red = red_flag_code in lap_statuses
-
-            incident_type = None
-            if is_red:
-                incident_type = 'RedFlag'
-            elif is_sc_vsc:
-                incident_type = 'SC/VSC' # Group SC/VSC for simplicity
-
-            if incident_type:
-                if current_incident and current_incident['type'] == incident_type:
-                    # Extend current incident
-                    current_incident['endLap'] = int(lap_num)
-                elif current_incident and current_incident['type'] != incident_type:
-                     # End previous incident, start new one
-                     incidents.append(current_incident)
-                     current_incident = {'type': incident_type, 'startLap': int(lap_num), 'endLap': int(lap_num)}
-                else:
-                    # Start new incident
-                    current_incident = {'type': incident_type, 'startLap': int(lap_num), 'endLap': int(lap_num)}
+        # Check if official results are missing or empty
+        if results_df is None or results_df.empty:
+            print(f"WARNING: Official results for {year} {event} {session_type} not available via Ergast/session.results. Calculating provisional results from lap timing.")
+            provisional = True
+            laps = session.laps
+            if laps is None or laps.empty:
+                print("ERROR: No lap data available to calculate provisional results.")
+                results_df = pd.DataFrame() # Return empty DataFrame if no laps
             else:
-                if current_incident:
-                    # End the current incident
-                    incidents.append(current_incident)
-                    current_incident = None
+                # Find the last lap for each driver based on their latest timestamp
+                # Ensure we handle potential NaT in Time before idxmax
+                valid_time_laps = laps.dropna(subset=['Time'])
+                if valid_time_laps.empty:
+                     print("ERROR: No laps with valid timestamps found.")
+                     results_df = pd.DataFrame()
+                else:
+                     last_laps_idx = valid_time_laps.groupby('Driver')['Time'].idxmax()
+                     last_laps = laps.loc[last_laps_idx].copy()
 
-        # Append the last incident if the session ended during one
-        if current_incident:
-            incidents.append(current_incident)
+                     # Get grid position if available from laps data
+                     if 'GridPosition' in laps.columns:
+                         # Get the earliest lap for each driver to reliably get starting grid pos
+                         grid_positions = laps.loc[laps.groupby('Driver')['LapNumber'].idxmin()][['Driver', 'GridPosition']].dropna().drop_duplicates('Driver').set_index('Driver')
+                         last_laps = last_laps.join(grid_positions, on='Driver')
+                     else:
+                         last_laps['GridPosition'] = 0 # Assign default if not found
 
-        print(f"Found {len(incidents)} incident periods.")
-        return incidents
+                     # --- Data Enrichment (Team, FullName, DriverNumber) ---
+                     # Attempt to get these from the session's drivers list if laps lack them
+                     driver_info = {}
+                     try:
+                         # Access session.drivers which should be populated after load
+                         # session.drivers is a dict {driver_code: DriverInfoObject}
+                         session_drivers_info = getattr(session, 'drivers', None)
+                         if session_drivers_info:
+                            # Need driver number mapping if laps doesn't have it
+                             for drv_num in session_drivers_info:
+                                 info = session.get_driver(drv_num) # Get driver info object
+                                 if info is not None:
+                                     code = info.get('Abbreviation', f'UNKNOWN_{drv_num}') # Use Abbreviation as the key
+                                     driver_info[code] = {
+                                        'DriverNumber': info.get('DriverNumber', drv_num),
+                                        'TeamName': info.get('TeamName', 'N/A'),
+                                        'FullName': info.get('FullName', code)
+                                     }
+                         else: # Fallback: Try unique values from laps if session.drivers fails
+                              if 'Team' in laps.columns:
+                                  teams = laps[['Driver', 'Team']].dropna().drop_duplicates('Driver').set_index('Driver')['Team'].to_dict()
+                              else: teams = {}
+                              if 'FullName' in laps.columns:
+                                  names = laps[['Driver', 'FullName']].dropna().drop_duplicates('Driver').set_index('Driver')['FullName'].to_dict()
+                              else: names = {}
+                              if 'DriverNumber' in laps.columns:
+                                  numbers = laps[['Driver', 'DriverNumber']].dropna().drop_duplicates('Driver').set_index('Driver')['DriverNumber'].to_dict()
+                              else: numbers = {}
 
+                              for code in last_laps['Driver'].unique():
+                                   driver_info[code] = {
+                                       'DriverNumber': numbers.get(code, 'N/A'),
+                                       'TeamName': teams.get(code, 'N/A'),
+                                       'FullName': names.get(code, code) # Use code if no FullName
+                                   }
+
+
+                     except Exception as e:
+                         print(f"Minor error getting driver details for enrichment: {e}")
+                         # Continue without full enrichment if error occurs
+
+
+                     # Apply enrichment to last_laps DataFrame
+                     last_laps['TeamName'] = last_laps['Driver'].map(lambda x: driver_info.get(x, {}).get('TeamName', 'N/A'))
+                     last_laps['FullName'] = last_laps['Driver'].map(lambda x: driver_info.get(x, {}).get('FullName', x))
+                     last_laps['DriverNumber'] = last_laps['Driver'].map(lambda x: driver_info.get(x, {}).get('DriverNumber', 'N/A'))
+                     # --- End Enrichment ---
+
+
+                     # Sort by LapNumber descending, then Time ascending
+                     last_laps = last_laps.sort_values(by=['LapNumber', 'Time'], ascending=[False, True])
+                     last_laps = last_laps.reset_index(drop=True) # Use 0-based index for position
+
+                     # Determine max laps for status calculation
+                     max_laps_completed = last_laps['LapNumber'].max()
+
+                     # Build the results DataFrame
+                     provisional_results_list = []
+                     for index, row in last_laps.iterrows():
+                         status = 'Finished'
+                         # Check if the driver completed the max laps
+                         if row['LapNumber'] < max_laps_completed:
+                             status = f"+{int(max_laps_completed - row['LapNumber'])} Lap(s)"
+                         # TODO: Add better logic here if we can determine DNF/Retired status reliably from messages or lap patterns
+
+                         # Use .get with defaults for safety, especially after enrichment attempts
+                         provisional_results_list.append({
+                             'DriverNumber': row.get('DriverNumber', 'N/A'),
+                             'Abbreviation': row['Driver'], # 'Driver' column holds the abbreviation
+                             'TeamName': row.get('TeamName', 'N/A'),
+                             'FullName': row.get('FullName', row['Driver']),
+                             'Position': index + 1, # Position based on final sort order
+                             'GridPosition': int(row.get('GridPosition', 0)), # Ensure int
+                             'Status': status,
+                             'Time': row['Time'], # This is the finish time on their last lap (or last recorded time)
+                             'Laps': int(row['LapNumber']), # Ensure int
+                             # 'Points': 0 # Points are usually official, omit for provisional
+                         })
+
+                     results_df = pd.DataFrame(provisional_results_list)
+
+                     # Define standard columns expected (similar to session.results)
+                     standard_cols = ['DriverNumber', 'Abbreviation', 'FullName', 'TeamName', 'Position', 'GridPosition', 'Status', 'Time', 'Laps']
+                     # Ensure all standard columns exist, fill missing with defaults if necessary
+                     for col in standard_cols:
+                         if col not in results_df.columns:
+                             results_df[col] = None # Or appropriate default (e.g., 0 for Laps/Position?)
+
+                     # Reorder and select standard columns
+                     results_df = results_df[standard_cols]
+
+        # Add the 'Provisional' flag column AFTER potentially creating the DataFrame
+        if results_df is not None:
+            # Ensure results_df is a DataFrame before adding column
+             if not isinstance(results_df, pd.DataFrame):
+                 print("Warning: results_df is not a DataFrame, cannot add Provisional column.")
+                 # Handle case where official results were some other type? Unlikely.
+             elif results_df.empty and provisional:
+                 # If we intended to create provisional but failed (e.g., no laps),
+                 # return an empty DF but maybe add the column still?
+                 results_df['Provisional'] = provisional # Add to empty DF
+             elif not results_df.empty:
+                 results_df['Provisional'] = provisional # Add the flag to populated DF
+
+        # --- Incident processing logic ---
+        incidents = []
+        messages = session.messages
+        if messages is not None and not messages.empty:
+             print(f"Processing {len(messages)} messages for incidents.")
+             # Filter relevant messages (e.g., flags, SC, VSC, investigations)
+             incident_keywords = ['FLAG', 'DEPLOYED', 'ENDED', 'CLEAR', 'INCIDENT', 'INVESTIGATED', 'PENALTY', 'STOP/GO', 'DRIVE THROUGH', 'RETIRED', 'PROBLEM', 'CRASH']
+             # Simpler approach: Look for keywords in the 'Message' column (assuming it exists)
+             # Note: session.messages structure might vary. Adapt based on actual columns.
+             # Assuming a 'Message' or 'Category' column might exist. Check `session.messages.columns`
+             if 'Message' in messages.columns:
+                 potential_incidents = messages[messages['Message'].str.contains('|'.join(incident_keywords), case=False, na=False)].copy()
+             elif 'Category' in messages.columns: # Alternative column name
+                 potential_incidents = messages[messages['Category'].str.contains('|'.join(incident_keywords), case=False, na=False)].copy()
+             else:
+                  print("Warning: Cannot find 'Message' or 'Category' column in session.messages for incident detection.")
+                  potential_incidents = pd.DataFrame() # Empty
+
+
+             if not potential_incidents.empty:
+                # Convert Time column to ISO format string if it's timedelta or datetime
+                if 'Time' in potential_incidents.columns:
+                    potential_incidents['TimeStr'] = potential_incidents['Time'].apply(lambda x: str(x)) # Simple string conversion
+                else:
+                    potential_incidents['TimeStr'] = 'N/A'
+
+                # Use DriverNumber results mapping for abbreviations if available
+                driver_abbr_map = {}
+                if results_df is not None and not results_df.empty and 'DriverNumber' in results_df.columns and 'Abbreviation' in results_df.columns:
+                     driver_abbr_map = results_df.set_index('DriverNumber')['Abbreviation'].to_dict()
+
+                for _, row in potential_incidents.iterrows():
+                    message_text = row.get('Message', row.get('Category', 'No Message Text')) # Get message content
+                    # Try to map driver number if present in the message context
+                    driver_number = row.get('RacingNumber', row.get('DriverNumber', None)) # Check common column names
+                    driver_code = driver_abbr_map.get(driver_number, None)
+
+                    incidents.append({
+                        "time": row['TimeStr'],
+                        "message": message_text,
+                        "category": row.get('Category', 'Generic'), # Use category if exists
+                        "flag": row.get('Flag', None), # Include flag if exists
+                        "scope": row.get('Scope', None), # Include scope if exists
+                        "driverCode": driver_code # Include driver code if mapped
+                    })
+
+        print(f"Found {len(incidents)} potential incidents.")
+        # --- Return both incidents list and results DataFrame ---
+        return incidents, results_df
+
+    except ff1.ErgastUnavailableError:
+         print("Ergast is unavailable. Cannot fetch official results or potentially some session info.")
+         # Attempt to proceed with provisional results if possible (depends if get_session worked)
+         # Re-running provisional logic here might be complex. Best to handle upstream or return error.
+         # For now, return empty results / raise specific error?
+         return [], pd.DataFrame({'Provisional': [True]}) # Return empty incidents and minimal provisional marker DF
+
+    except ff1.FastF1Error as f1_error: # Catch specific FastF1 errors
+        print(f"A FastF1 error occurred: {f1_error}")
+        # Decide if we can still return provisional or need to raise
+        # If session loading failed, we can't do much.
+        raise f1_error # Re-raise for API handler
     except Exception as e:
-        print(f"Error fetching session incidents: {e}")
-        # import traceback # Optional detailed trace
-        # traceback.print_exc()
-        # Return empty list on error to avoid breaking frontend,
-        # could also raise to let API return 500
-        return []
+        print(f"An unexpected error occurred in fetch_session_incidents_and_results: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return empty lists/frames to avoid breaking API structure if possible
+        # Or re-raise depending on desired API robustness
+        raise e
 
 # Restore Stint Analysis processing function
 def fetch_and_process_stint_analysis(year: int, event: str, session_type: str) -> list[dict] | None:
@@ -753,31 +930,59 @@ def fetch_and_process_stint_analysis(year: int, event: str, session_type: str) -
                 if 'LapTimeSeconds' not in drv_laps.columns:
                     drv_laps['LapTimeSeconds'] = drv_laps['LapTime'].dt.total_seconds()
 
+                # Check if 'TrackStatus' exists for filtering
+                has_track_status = 'TrackStatus' in drv_laps.columns
+                if not has_track_status:
+                    print(f" - Warning: 'TrackStatus' column not found for driver {drv_code}. Cannot filter SC/VSC laps.")
+
                 # Group by Stint
                 stints_grouped = drv_laps.groupby("Stint")
 
                 for stint_num, stint_laps_df in stints_grouped:
                     if stint_laps_df.empty: continue
 
-                    compound = stint_laps_df["Compound"].iloc[0]
-                    start_lap = stint_laps_df["LapNumber"].min()
-                    end_lap = stint_laps_df["LapNumber"].max()
-                    
-                    # Extract lap times (in seconds) for this specific stint, handling potential NaNs
-                    lap_times_seconds = stint_laps_df['LapTimeSeconds'].dropna().tolist()
+                    # --- Filter for Green Flag Laps ---
+                    if has_track_status:
+                        # Assuming '1' represents green flag. Adjust if needed based on FastF1 version/data.
+                        green_flag_laps_df = stint_laps_df[stint_laps_df['TrackStatus'] == '1'].copy()
+                        if green_flag_laps_df.empty:
+                            # print(f" - Driver {drv_code}, Stint {stint_num}: No green flag laps found in stint.")
+                            # If no green laps, we'll skip this stint later based on empty lap_times_seconds
+                            pass 
+                    else:
+                        # Fallback if TrackStatus column is missing
+                        green_flag_laps_df = stint_laps_df.copy()
+                    # ---------------------------------
 
-                    stint_analysis_list.append({
-                        "driverCode": drv_code,
-                        "stintNumber": int(stint_num),
-                        "compound": compound,
-                        "startLap": int(start_lap),
-                        "endLap": int(end_lap),
-                        "lapTimes": lap_times_seconds # List of lap times in seconds
-                    })
+                    # If filtering resulted in no green flag laps, skip this stint
+                    if green_flag_laps_df.empty:
+                        # print(f" - Driver {drv_code}, Stint {stint_num}: Skipping stint due to no green flag laps.")
+                        continue
+
+                    compound = green_flag_laps_df["Compound"].iloc[0]
+                    # Use green flag laps for start/end, but this might be slightly confusing if first/last laps were SC
+                    # Sticking with green flag laps for now as it reflects the laps used for timing.
+                    start_lap = green_flag_laps_df["LapNumber"].min()
+                    end_lap = green_flag_laps_df["LapNumber"].max()
+                    
+                    # Extract lap times (in seconds) from the *filtered* DataFrame, handling potential NaNs
+                    lap_times_seconds = green_flag_laps_df['LapTimeSeconds'].dropna().tolist()
+
+                    # Only add stint if there are valid lap times after filtering
+                    if lap_times_seconds:
+                        stint_analysis_list.append({
+                            "driverCode": drv_code,
+                            "stintNumber": int(stint_num),
+                            "compound": compound,
+                            "startLap": int(start_lap),
+                            "endLap": int(end_lap),
+                            "lapTimes": lap_times_seconds # List of *green flag* lap times in seconds
+                        })
+                    # else:
+                        # print(f" - Driver {drv_code}, Stint {stint_num}: Skipping stint as no valid lap times remain after dropna().")
+
             except Exception as inner_e:
                 print(f"Error processing stint analysis for driver {drv_code}: {inner_e}")
-                import traceback
-                traceback.print_exc()
 
         print(f"Successfully processed stint analysis for {len(drivers)} drivers.")
         return stint_analysis_list
