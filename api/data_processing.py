@@ -965,18 +965,22 @@ def fetch_and_process_stint_analysis(year: int, event: str, session_type: str) -
                     start_lap = green_flag_laps_df["LapNumber"].min()
                     end_lap = green_flag_laps_df["LapNumber"].max()
                     
-                    # Extract lap times (in seconds) from the *filtered* DataFrame, handling potential NaNs
-                    lap_times_seconds = green_flag_laps_df['LapTimeSeconds'].dropna().tolist()
+                    # Extract lap details (number and time in seconds) from the *filtered* DataFrame
+                    lap_details = [
+                        {"lapNumber": int(row["LapNumber"]), "lapTime": float(row["LapTimeSeconds"]) }
+                        for _, row in green_flag_laps_df.iterrows() 
+                        if pd.notna(row["LapTimeSeconds"])
+                    ]
 
                     # Only add stint if there are valid lap times after filtering
-                    if lap_times_seconds:
+                    if lap_details:
                         stint_analysis_list.append({
                             "driverCode": drv_code,
                             "stintNumber": int(stint_num),
                             "compound": compound,
                             "startLap": int(start_lap),
                             "endLap": int(end_lap),
-                            "lapTimes": lap_times_seconds # List of *green flag* lap times in seconds
+                            "lapDetails": lap_details # List of {lapNumber, lapTime} dicts
                         })
                     # else:
                         # print(f" - Driver {drv_code}, Stint {stint_num}: Skipping stint as no valid lap times remain after dropna().")
