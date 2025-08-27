@@ -1,0 +1,372 @@
+[
+  {
+    "driver": "PIA",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 14,
+        "lapCount": 14
+      },
+      {
+        "compound": "HARD",
+        "startLap": 15,
+        "endLap": 56,
+        "lapCount": 42
+      }
+    ]
+  },
+  {
+    "driver": "NOR",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 15,
+        "lapCount": 15
+      },
+      {
+        "compound": "HARD",
+        "startLap": 16,
+        "endLap": 56,
+        "lapCount": 41
+      }
+    ]
+  },
+  {
+    "driver": "RUS",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 14,
+        "lapCount": 14
+      },
+      {
+        "compound": "HARD",
+        "startLap": 15,
+        "endLap": 56,
+        "lapCount": 42
+      }
+    ]
+  },
+  {
+    "driver": "VER",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 13,
+        "lapCount": 13
+      },
+      {
+        "compound": "HARD",
+        "startLap": 14,
+        "endLap": 56,
+        "lapCount": 43
+      }
+    ]
+  },
+  {
+    "driver": "OCO",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 11,
+        "lapCount": 11
+      },
+      {
+        "compound": "HARD",
+        "startLap": 12,
+        "endLap": 56,
+        "lapCount": 45
+      }
+    ]
+  },
+  {
+    "driver": "ANT",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 12,
+        "lapCount": 12
+      },
+      {
+        "compound": "HARD",
+        "startLap": 13,
+        "endLap": 56,
+        "lapCount": 44
+      }
+    ]
+  },
+  {
+    "driver": "ALB",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 20,
+        "lapCount": 20
+      },
+      {
+        "compound": "HARD",
+        "startLap": 21,
+        "endLap": 56,
+        "lapCount": 36
+      }
+    ]
+  },
+  {
+    "driver": "BEA",
+    "stints": [
+      {
+        "compound": "HARD",
+        "startLap": 1,
+        "endLap": 26,
+        "lapCount": 26
+      },
+      {
+        "compound": "MEDIUM",
+        "startLap": 27,
+        "endLap": 56,
+        "lapCount": 30
+      }
+    ]
+  },
+  {
+    "driver": "STR",
+    "stints": [
+      {
+        "compound": "HARD",
+        "startLap": 1,
+        "endLap": 36,
+        "lapCount": 36
+      },
+      {
+        "compound": "MEDIUM",
+        "startLap": 37,
+        "endLap": 56,
+        "lapCount": 20
+      }
+    ]
+  },
+  {
+    "driver": "SAI",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 17,
+        "lapCount": 17
+      },
+      {
+        "compound": "HARD",
+        "startLap": 18,
+        "endLap": 56,
+        "lapCount": 39
+      }
+    ]
+  },
+  {
+    "driver": "HAD",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 12,
+        "lapCount": 12
+      },
+      {
+        "compound": "HARD",
+        "startLap": 13,
+        "endLap": 33,
+        "lapCount": 21
+      },
+      {
+        "compound": "HARD",
+        "startLap": 34,
+        "endLap": 56,
+        "lapCount": 23
+      }
+    ]
+  },
+  {
+    "driver": "LAW",
+    "stints": [
+      {
+        "compound": "HARD",
+        "startLap": 1,
+        "endLap": 18,
+        "lapCount": 18
+      },
+      {
+        "compound": "MEDIUM",
+        "startLap": 19,
+        "endLap": 30,
+        "lapCount": 12
+      },
+      {
+        "compound": "HARD",
+        "startLap": 31,
+        "endLap": 56,
+        "lapCount": 26
+      }
+    ]
+  },
+  {
+    "driver": "DOO",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 11,
+        "lapCount": 11
+      },
+      {
+        "compound": "HARD",
+        "startLap": 12,
+        "endLap": 56,
+        "lapCount": 45
+      }
+    ]
+  },
+  {
+    "driver": "BOR",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 1,
+        "lapCount": 1
+      },
+      {
+        "compound": "HARD",
+        "startLap": 2,
+        "endLap": 26,
+        "lapCount": 25
+      },
+      {
+        "compound": "HARD",
+        "startLap": 27,
+        "endLap": 55,
+        "lapCount": 29
+      }
+    ]
+  },
+  {
+    "driver": "HUL",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 20,
+        "lapCount": 20
+      },
+      {
+        "compound": "HARD",
+        "startLap": 21,
+        "endLap": 55,
+        "lapCount": 35
+      }
+    ]
+  },
+  {
+    "driver": "TSU",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 11,
+        "lapCount": 11
+      },
+      {
+        "compound": "HARD",
+        "startLap": 12,
+        "endLap": 35,
+        "lapCount": 24
+      },
+      {
+        "compound": "HARD",
+        "startLap": 36,
+        "endLap": 46,
+        "lapCount": 11
+      },
+      {
+        "compound": "MEDIUM",
+        "startLap": 47,
+        "endLap": 55,
+        "lapCount": 9
+      }
+    ]
+  },
+  {
+    "driver": "ALO",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 4,
+        "lapCount": 4
+      }
+    ]
+  },
+  {
+    "driver": "LEC",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 15,
+        "lapCount": 15
+      },
+      {
+        "compound": "HARD",
+        "startLap": 16,
+        "endLap": 56,
+        "lapCount": 41
+      }
+    ]
+  },
+  {
+    "driver": "HAM",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 13,
+        "lapCount": 13
+      },
+      {
+        "compound": "HARD",
+        "startLap": 14,
+        "endLap": 37,
+        "lapCount": 24
+      },
+      {
+        "compound": "HARD",
+        "startLap": 38,
+        "endLap": 56,
+        "lapCount": 19
+      }
+    ]
+  },
+  {
+    "driver": "GAS",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 10,
+        "lapCount": 10
+      },
+      {
+        "compound": "HARD",
+        "startLap": 11,
+        "endLap": 56,
+        "lapCount": 46
+      }
+    ]
+  }
+]

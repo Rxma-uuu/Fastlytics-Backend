@@ -1,0 +1,52 @@
+[
+  {
+    "code": "ALB",
+    "name": "Alexander Albon",
+    "team": "Williams"
+  },
+  {
+    "code": "ANT",
+    "name": "Kimi Antonelli",
+    "team": "Mercedes"
+  },
+  {
+    "code": "LEC",
+    "name": "Charles Leclerc",
+    "team": "Ferrari"
+  },
+  {
+    "code": "NOR",
+    "name": "Lando Norris",
+    "team": "McLaren"
+  },
+  {
+    "code": "OCO",
+    "name": "Esteban Ocon",
+    "team": "Haas F1 Team"
+  },
+  {
+    "code": "PIA",
+    "name": "Oscar Piastri",
+    "team": "McLaren"
+  },
+  {
+    "code": "RUS",
+    "name": "George Russell",
+    "team": "Mercedes"
+  },
+  {
+    "code": "SAI",
+    "name": "Carlos Sainz",
+    "team": "Williams"
+  },
+  {
+    "code": "TSU",
+    "name": "Yuki Tsunoda",
+    "team": "Red Bull Racing"
+  },
+  {
+    "code": "VER",
+    "name": "Max Verstappen",
+    "team": "Red Bull Racing"
+  }
+]

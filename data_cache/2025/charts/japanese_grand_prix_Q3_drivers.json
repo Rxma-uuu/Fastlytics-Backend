@@ -1,0 +1,52 @@
+[
+  {
+    "code": "ALB",
+    "name": "Alexander Albon",
+    "team": "Williams"
+  },
+  {
+    "code": "ANT",
+    "name": "Kimi Antonelli",
+    "team": "Mercedes"
+  },
+  {
+    "code": "BEA",
+    "name": "Oliver Bearman",
+    "team": "Haas F1 Team"
+  },
+  {
+    "code": "HAD",
+    "name": "Isack Hadjar",
+    "team": "Racing Bulls"
+  },
+  {
+    "code": "HAM",
+    "name": "Lewis Hamilton",
+    "team": "Ferrari"
+  },
+  {
+    "code": "LEC",
+    "name": "Charles Leclerc",
+    "team": "Ferrari"
+  },
+  {
+    "code": "NOR",
+    "name": "Lando Norris",
+    "team": "McLaren"
+  },
+  {
+    "code": "PIA",
+    "name": "Oscar Piastri",
+    "team": "McLaren"
+  },
+  {
+    "code": "RUS",
+    "name": "George Russell",
+    "team": "Mercedes"
+  },
+  {
+    "code": "VER",
+    "name": "Max Verstappen",
+    "team": "Red Bull Racing"
+  }
+]

@@ -1,0 +1,480 @@
+[
+  {
+    "driver": "VER",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 17,
+        "lapCount": 17
+      },
+      {
+        "compound": "HARD",
+        "startLap": 18,
+        "endLap": 37,
+        "lapCount": 20
+      },
+      {
+        "compound": "SOFT",
+        "startLap": 38,
+        "endLap": 57,
+        "lapCount": 20
+      }
+    ]
+  },
+  {
+    "driver": "PER",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 12,
+        "lapCount": 12
+      },
+      {
+        "compound": "HARD",
+        "startLap": 13,
+        "endLap": 36,
+        "lapCount": 24
+      },
+      {
+        "compound": "SOFT",
+        "startLap": 37,
+        "endLap": 57,
+        "lapCount": 21
+      }
+    ]
+  },
+  {
+    "driver": "SAI",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 14,
+        "lapCount": 14
+      },
+      {
+        "compound": "HARD",
+        "startLap": 15,
+        "endLap": 35,
+        "lapCount": 21
+      },
+      {
+        "compound": "HARD",
+        "startLap": 36,
+        "endLap": 57,
+        "lapCount": 22
+      }
+    ]
+  },
+  {
+    "driver": "LEC",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 11,
+        "lapCount": 11
+      },
+      {
+        "compound": "HARD",
+        "startLap": 12,
+        "endLap": 34,
+        "lapCount": 23
+      },
+      {
+        "compound": "HARD",
+        "startLap": 35,
+        "endLap": 57,
+        "lapCount": 23
+      }
+    ]
+  },
+  {
+    "driver": "RUS",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 11,
+        "lapCount": 11
+      },
+      {
+        "compound": "HARD",
+        "startLap": 12,
+        "endLap": 31,
+        "lapCount": 20
+      },
+      {
+        "compound": "HARD",
+        "startLap": 32,
+        "endLap": 57,
+        "lapCount": 26
+      }
+    ]
+  },
+  {
+    "driver": "NOR",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 13,
+        "lapCount": 13
+      },
+      {
+        "compound": "HARD",
+        "startLap": 14,
+        "endLap": 33,
+        "lapCount": 20
+      },
+      {
+        "compound": "HARD",
+        "startLap": 34,
+        "endLap": 57,
+        "lapCount": 24
+      }
+    ]
+  },
+  {
+    "driver": "HAM",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 12,
+        "lapCount": 12
+      },
+      {
+        "compound": "HARD",
+        "startLap": 13,
+        "endLap": 33,
+        "lapCount": 21
+      },
+      {
+        "compound": "HARD",
+        "startLap": 34,
+        "endLap": 57,
+        "lapCount": 24
+      }
+    ]
+  },
+  {
+    "driver": "PIA",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 12,
+        "lapCount": 12
+      },
+      {
+        "compound": "HARD",
+        "startLap": 13,
+        "endLap": 34,
+        "lapCount": 22
+      },
+      {
+        "compound": "HARD",
+        "startLap": 35,
+        "endLap": 57,
+        "lapCount": 23
+      }
+    ]
+  },
+  {
+    "driver": "ALO",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 15,
+        "lapCount": 15
+      },
+      {
+        "compound": "HARD",
+        "startLap": 16,
+        "endLap": 41,
+        "lapCount": 26
+      },
+      {
+        "compound": "HARD",
+        "startLap": 42,
+        "endLap": 57,
+        "lapCount": 16
+      }
+    ]
+  },
+  {
+    "driver": "STR",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 9,
+        "lapCount": 9
+      },
+      {
+        "compound": "HARD",
+        "startLap": 10,
+        "endLap": 27,
+        "lapCount": 18
+      },
+      {
+        "compound": "HARD",
+        "startLap": 28,
+        "endLap": 57,
+        "lapCount": 30
+      }
+    ]
+  },
+  {
+    "driver": "ZHO",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 9,
+        "lapCount": 9
+      },
+      {
+        "compound": "HARD",
+        "startLap": 10,
+        "endLap": 28,
+        "lapCount": 19
+      },
+      {
+        "compound": "HARD",
+        "startLap": 29,
+        "endLap": 56,
+        "lapCount": 28
+      }
+    ]
+  },
+  {
+    "driver": "MAG",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 11,
+        "lapCount": 11
+      },
+      {
+        "compound": "HARD",
+        "startLap": 12,
+        "endLap": 32,
+        "lapCount": 21
+      },
+      {
+        "compound": "HARD",
+        "startLap": 33,
+        "endLap": 56,
+        "lapCount": 24
+      }
+    ]
+  },
+  {
+    "driver": "RIC",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 13,
+        "lapCount": 13
+      },
+      {
+        "compound": "HARD",
+        "startLap": 14,
+        "endLap": 35,
+        "lapCount": 22
+      },
+      {
+        "compound": "SOFT",
+        "startLap": 36,
+        "endLap": 56,
+        "lapCount": 21
+      }
+    ]
+  },
+  {
+    "driver": "TSU",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 14,
+        "lapCount": 14
+      },
+      {
+        "compound": "HARD",
+        "startLap": 15,
+        "endLap": 34,
+        "lapCount": 20
+      },
+      {
+        "compound": "HARD",
+        "startLap": 35,
+        "endLap": 56,
+        "lapCount": 22
+      }
+    ]
+  },
+  {
+    "driver": "ALB",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 15,
+        "lapCount": 15
+      },
+      {
+        "compound": "HARD",
+        "startLap": 16,
+        "endLap": 36,
+        "lapCount": 21
+      },
+      {
+        "compound": "HARD",
+        "startLap": 37,
+        "endLap": 56,
+        "lapCount": 20
+      }
+    ]
+  },
+  {
+    "driver": "HUL",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 1,
+        "lapCount": 1
+      },
+      {
+        "compound": "HARD",
+        "startLap": 2,
+        "endLap": 20,
+        "lapCount": 19
+      },
+      {
+        "compound": "HARD",
+        "startLap": 21,
+        "endLap": 41,
+        "lapCount": 21
+      },
+      {
+        "compound": "SOFT",
+        "startLap": 42,
+        "endLap": 56,
+        "lapCount": 15
+      }
+    ]
+  },
+  {
+    "driver": "OCO",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 10,
+        "lapCount": 10
+      },
+      {
+        "compound": "HARD",
+        "startLap": 11,
+        "endLap": 30,
+        "lapCount": 20
+      },
+      {
+        "compound": "HARD",
+        "startLap": 31,
+        "endLap": 56,
+        "lapCount": 26
+      }
+    ]
+  },
+  {
+    "driver": "GAS",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 12,
+        "lapCount": 12
+      },
+      {
+        "compound": "HARD",
+        "startLap": 13,
+        "endLap": 31,
+        "lapCount": 19
+      },
+      {
+        "compound": "HARD",
+        "startLap": 32,
+        "endLap": 43,
+        "lapCount": 12
+      },
+      {
+        "compound": "SOFT",
+        "startLap": 44,
+        "endLap": 56,
+        "lapCount": 13
+      }
+    ]
+  },
+  {
+    "driver": "BOT",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 12,
+        "lapCount": 12
+      },
+      {
+        "compound": "HARD",
+        "startLap": 13,
+        "endLap": 30,
+        "lapCount": 18
+      },
+      {
+        "compound": "HARD",
+        "startLap": 31,
+        "endLap": 56,
+        "lapCount": 26
+      }
+    ]
+  },
+  {
+    "driver": "SAR",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 10,
+        "lapCount": 10
+      },
+      {
+        "compound": "HARD",
+        "startLap": 11,
+        "endLap": 28,
+        "lapCount": 18
+      },
+      {
+        "compound": "HARD",
+        "startLap": 29,
+        "endLap": 40,
+        "lapCount": 12
+      },
+      {
+        "compound": "SOFT",
+        "startLap": 41,
+        "endLap": 55,
+        "lapCount": 15
+      }
+    ]
+  }
+]

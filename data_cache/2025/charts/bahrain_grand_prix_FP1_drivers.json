@@ -1,0 +1,102 @@
+[
+  {
+    "code": "ALB",
+    "name": "Alexander Albon",
+    "team": "Williams"
+  },
+  {
+    "code": "ANT",
+    "name": "Kimi Antonelli",
+    "team": "Mercedes"
+  },
+  {
+    "code": "BEG",
+    "name": "Dino Beganovic",
+    "team": "Ferrari"
+  },
+  {
+    "code": "BOR",
+    "name": "Gabriel Bortoleto",
+    "team": "Kick Sauber"
+  },
+  {
+    "code": "BRO",
+    "name": "Luke Browning",
+    "team": "Williams"
+  },
+  {
+    "code": "DOO",
+    "name": "Jack Doohan",
+    "team": "Alpine"
+  },
+  {
+    "code": "DRU",
+    "name": "Felipe Drugovich",
+    "team": "Aston Martin"
+  },
+  {
+    "code": "GAS",
+    "name": "Pierre Gasly",
+    "team": "Alpine"
+  },
+  {
+    "code": "HAD",
+    "name": "Isack Hadjar",
+    "team": "Racing Bulls"
+  },
+  {
+    "code": "HAM",
+    "name": "Lewis Hamilton",
+    "team": "Ferrari"
+  },
+  {
+    "code": "HIR",
+    "name": "Ryo Hirakawa",
+    "team": "Haas F1 Team"
+  },
+  {
+    "code": "HUL",
+    "name": "Nico Hulkenberg",
+    "team": "Kick Sauber"
+  },
+  {
+    "code": "IWA",
+    "name": "Ayumu Iwasa",
+    "team": "Red Bull Racing"
+  },
+  {
+    "code": "LAW",
+    "name": "Liam Lawson",
+    "team": "Racing Bulls"
+  },
+  {
+    "code": "NOR",
+    "name": "Lando Norris",
+    "team": "McLaren"
+  },
+  {
+    "code": "OCO",
+    "name": "Esteban Ocon",
+    "team": "Haas F1 Team"
+  },
+  {
+    "code": "PIA",
+    "name": "Oscar Piastri",
+    "team": "McLaren"
+  },
+  {
+    "code": "STR",
+    "name": "Lance Stroll",
+    "team": "Aston Martin"
+  },
+  {
+    "code": "TSU",
+    "name": "Yuki Tsunoda",
+    "team": "Red Bull Racing"
+  },
+  {
+    "code": "VES",
+    "name": "Frederik Vesti",
+    "team": "Mercedes"
+  }
+]

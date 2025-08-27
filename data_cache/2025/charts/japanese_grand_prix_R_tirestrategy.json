@@ -1,0 +1,348 @@
+[
+  {
+    "driver": "VER",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 21,
+        "lapCount": 21
+      },
+      {
+        "compound": "HARD",
+        "startLap": 22,
+        "endLap": 53,
+        "lapCount": 32
+      }
+    ]
+  },
+  {
+    "driver": "NOR",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 21,
+        "lapCount": 21
+      },
+      {
+        "compound": "HARD",
+        "startLap": 22,
+        "endLap": 53,
+        "lapCount": 32
+      }
+    ]
+  },
+  {
+    "driver": "PIA",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 20,
+        "lapCount": 20
+      },
+      {
+        "compound": "HARD",
+        "startLap": 21,
+        "endLap": 53,
+        "lapCount": 33
+      }
+    ]
+  },
+  {
+    "driver": "LEC",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 21,
+        "lapCount": 21
+      },
+      {
+        "compound": "HARD",
+        "startLap": 22,
+        "endLap": 53,
+        "lapCount": 32
+      }
+    ]
+  },
+  {
+    "driver": "RUS",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 19,
+        "lapCount": 19
+      },
+      {
+        "compound": "HARD",
+        "startLap": 20,
+        "endLap": 53,
+        "lapCount": 34
+      }
+    ]
+  },
+  {
+    "driver": "ANT",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 31,
+        "lapCount": 31
+      },
+      {
+        "compound": "HARD",
+        "startLap": 32,
+        "endLap": 53,
+        "lapCount": 22
+      }
+    ]
+  },
+  {
+    "driver": "HAM",
+    "stints": [
+      {
+        "compound": "HARD",
+        "startLap": 1,
+        "endLap": 30,
+        "lapCount": 30
+      },
+      {
+        "compound": "MEDIUM",
+        "startLap": 31,
+        "endLap": 53,
+        "lapCount": 23
+      }
+    ]
+  },
+  {
+    "driver": "HAD",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 25,
+        "lapCount": 25
+      },
+      {
+        "compound": "HARD",
+        "startLap": 26,
+        "endLap": 53,
+        "lapCount": 28
+      }
+    ]
+  },
+  {
+    "driver": "ALB",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 24,
+        "lapCount": 24
+      },
+      {
+        "compound": "HARD",
+        "startLap": 25,
+        "endLap": 53,
+        "lapCount": 29
+      }
+    ]
+  },
+  {
+    "driver": "BEA",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 23,
+        "lapCount": 23
+      },
+      {
+        "compound": "HARD",
+        "startLap": 24,
+        "endLap": 53,
+        "lapCount": 30
+      }
+    ]
+  },
+  {
+    "driver": "ALO",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 24,
+        "lapCount": 24
+      },
+      {
+        "compound": "HARD",
+        "startLap": 25,
+        "endLap": 53,
+        "lapCount": 29
+      }
+    ]
+  },
+  {
+    "driver": "TSU",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 23,
+        "lapCount": 23
+      },
+      {
+        "compound": "HARD",
+        "startLap": 24,
+        "endLap": 53,
+        "lapCount": 30
+      }
+    ]
+  },
+  {
+    "driver": "GAS",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 24,
+        "lapCount": 24
+      },
+      {
+        "compound": "HARD",
+        "startLap": 25,
+        "endLap": 53,
+        "lapCount": 29
+      }
+    ]
+  },
+  {
+    "driver": "SAI",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 33,
+        "lapCount": 33
+      },
+      {
+        "compound": "SOFT",
+        "startLap": 34,
+        "endLap": 53,
+        "lapCount": 20
+      }
+    ]
+  },
+  {
+    "driver": "DOO",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 15,
+        "lapCount": 15
+      },
+      {
+        "compound": "HARD",
+        "startLap": 16,
+        "endLap": 53,
+        "lapCount": 38
+      }
+    ]
+  },
+  {
+    "driver": "HUL",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 22,
+        "lapCount": 22
+      },
+      {
+        "compound": "HARD",
+        "startLap": 23,
+        "endLap": 53,
+        "lapCount": 31
+      }
+    ]
+  },
+  {
+    "driver": "LAW",
+    "stints": [
+      {
+        "compound": "MEDIUM",
+        "startLap": 1,
+        "endLap": 33,
+        "lapCount": 33
+      },
+      {
+        "compound": "SOFT",
+        "startLap": 34,
+        "endLap": 53,
+        "lapCount": 20
+      }
+    ]
+  },
+  {
+    "driver": "OCO",
+    "stints": [
+      {
+        "compound": "HARD",
+        "startLap": 1,
+        "endLap": 32,
+        "lapCount": 32
+      },
+      {
+        "compound": "MEDIUM",
+        "startLap": 33,
+        "endLap": 53,
+        "lapCount": 21
+      }
+    ]
+  },
+  {
+    "driver": "BOR",
+    "stints": [
+      {
+        "compound": "HARD",
+        "startLap": 1,
+        "endLap": 31,
+        "lapCount": 31
+      },
+      {
+        "compound": "MEDIUM",
+        "startLap": 32,
+        "endLap": 53,
+        "lapCount": 22
+      }
+    ]
+  },
+  {
+    "driver": "STR",
+    "stints": [
+      {
+        "compound": "SOFT",
+        "startLap": 1,
+        "endLap": 9,
+        "lapCount": 9
+      },
+      {
+        "compound": "HARD",
+        "startLap": 10,
+        "endLap": 30,
+        "lapCount": 21
+      },
+      {
+        "compound": "MEDIUM",
+        "startLap": 31,
+        "endLap": 52,
+        "lapCount": 22
+      }
+    ]
+  }
+]

@@ -1,0 +1,102 @@
+[
+  {
+    "code": "ALB",
+    "name": "Alexander Albon",
+    "team": "Williams"
+  },
+  {
+    "code": "ALO",
+    "name": "Fernando Alonso",
+    "team": "Aston Martin"
+  },
+  {
+    "code": "BOT",
+    "name": "Valtteri Bottas",
+    "team": "Kick Sauber"
+  },
+  {
+    "code": "GAS",
+    "name": "Pierre Gasly",
+    "team": "Alpine"
+  },
+  {
+    "code": "HAM",
+    "name": "Lewis Hamilton",
+    "team": "Mercedes"
+  },
+  {
+    "code": "HUL",
+    "name": "Nico Hulkenberg",
+    "team": "Haas F1 Team"
+  },
+  {
+    "code": "LEC",
+    "name": "Charles Leclerc",
+    "team": "Ferrari"
+  },
+  {
+    "code": "MAG",
+    "name": "Kevin Magnussen",
+    "team": "Haas F1 Team"
+  },
+  {
+    "code": "NOR",
+    "name": "Lando Norris",
+    "team": "McLaren"
+  },
+  {
+    "code": "OCO",
+    "name": "Esteban Ocon",
+    "team": "Alpine"
+  },
+  {
+    "code": "PER",
+    "name": "Sergio Perez",
+    "team": "Red Bull Racing"
+  },
+  {
+    "code": "PIA",
+    "name": "Oscar Piastri",
+    "team": "McLaren"
+  },
+  {
+    "code": "RIC",
+    "name": "Daniel Ricciardo",
+    "team": "RB"
+  },
+  {
+    "code": "RUS",
+    "name": "George Russell",
+    "team": "Mercedes"
+  },
+  {
+    "code": "SAI",
+    "name": "Carlos Sainz",
+    "team": "Ferrari"
+  },
+  {
+    "code": "SAR",
+    "name": "Logan Sargeant",
+    "team": "Williams"
+  },
+  {
+    "code": "STR",
+    "name": "Lance Stroll",
+    "team": "Aston Martin"
+  },
+  {
+    "code": "TSU",
+    "name": "Yuki Tsunoda",
+    "team": "RB"
+  },
+  {
+    "code": "VER",
+    "name": "Max Verstappen",
+    "team": "Red Bull Racing"
+  },
+  {
+    "code": "ZHO",
+    "name": "Guanyu Zhou",
+    "team": "Kick Sauber"
+  }
+]

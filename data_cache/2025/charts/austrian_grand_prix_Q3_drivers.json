@@ -1,0 +1,52 @@
+[
+  {
+    "code": "ANT",
+    "name": "Kimi Antonelli",
+    "team": "Mercedes"
+  },
+  {
+    "code": "BOR",
+    "name": "Gabriel Bortoleto",
+    "team": "Kick Sauber"
+  },
+  {
+    "code": "GAS",
+    "name": "Pierre Gasly",
+    "team": "Alpine"
+  },
+  {
+    "code": "HAM",
+    "name": "Lewis Hamilton",
+    "team": "Ferrari"
+  },
+  {
+    "code": "LAW",
+    "name": "Liam Lawson",
+    "team": "Racing Bulls"
+  },
+  {
+    "code": "LEC",
+    "name": "Charles Leclerc",
+    "team": "Ferrari"
+  },
+  {
+    "code": "NOR",
+    "name": "Lando Norris",
+    "team": "McLaren"
+  },
+  {
+    "code": "PIA",
+    "name": "Oscar Piastri",
+    "team": "McLaren"
+  },
+  {
+    "code": "RUS",
+    "name": "George Russell",
+    "team": "Mercedes"
+  },
+  {
+    "code": "VER",
+    "name": "Max Verstappen",
+    "team": "Red Bull Racing"
+  }
+]

@@ -1,0 +1,102 @@
+[
+  {
+    "code": "ALO",
+    "name": "Fernando Alonso",
+    "team": "Aston Martin"
+  },
+  {
+    "code": "ANT",
+    "name": "Kimi Antonelli",
+    "team": "Mercedes"
+  },
+  {
+    "code": "BEA",
+    "name": "Oliver Bearman",
+    "team": "Haas F1 Team"
+  },
+  {
+    "code": "BOR",
+    "name": "Gabriel Bortoleto",
+    "team": "Kick Sauber"
+  },
+  {
+    "code": "COL",
+    "name": "Franco Colapinto",
+    "team": "Alpine"
+  },
+  {
+    "code": "GAS",
+    "name": "Pierre Gasly",
+    "team": "Alpine"
+  },
+  {
+    "code": "HAD",
+    "name": "Isack Hadjar",
+    "team": "Racing Bulls"
+  },
+  {
+    "code": "HAM",
+    "name": "Lewis Hamilton",
+    "team": "Ferrari"
+  },
+  {
+    "code": "HIR",
+    "name": "Ryo Hirakawa",
+    "team": "Haas F1 Team"
+  },
+  {
+    "code": "HUL",
+    "name": "Nico Hulkenberg",
+    "team": "Kick Sauber"
+  },
+  {
+    "code": "LAW",
+    "name": "Liam Lawson",
+    "team": "Racing Bulls"
+  },
+  {
+    "code": "LEC",
+    "name": "Charles Leclerc",
+    "team": "Ferrari"
+  },
+  {
+    "code": "MAR",
+    "name": "Victor Martins",
+    "team": "Williams"
+  },
+  {
+    "code": "NOR",
+    "name": "Lando Norris",
+    "team": "McLaren"
+  },
+  {
+    "code": "PIA",
+    "name": "Oscar Piastri",
+    "team": "McLaren"
+  },
+  {
+    "code": "RUS",
+    "name": "George Russell",
+    "team": "Mercedes"
+  },
+  {
+    "code": "SAI",
+    "name": "Carlos Sainz",
+    "team": "Williams"
+  },
+  {
+    "code": "STR",
+    "name": "Lance Stroll",
+    "team": "Aston Martin"
+  },
+  {
+    "code": "TSU",
+    "name": "Yuki Tsunoda",
+    "team": "Red Bull Racing"
+  },
+  {
+    "code": "VER",
+    "name": "Max Verstappen",
+    "team": "Red Bull Racing"
+  }
+]
